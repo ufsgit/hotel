@@ -1,0 +1,57 @@
+<div class="mb-6 flex justify-between items-center">
+  <h2 class="text-3xl font-extrabold text-indigo-950 tracking-tight">Dashboard Overview</h2>
+  <div class="text-sm text-indigo-600 font-medium">Last 7 Days</div>
+</div>
+
+<div *ngIf="isLoading" class="flex justify-center py-12">
+  <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-800"></div>
+</div>
+
+<div *ngIf="!isLoading" @staggerList class="space-y-6">
+  <!-- Stats Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="glass-card rounded-2xl p-6 stagger-item flex flex-col justify-center">
+      <div class="text-sm font-bold text-indigo-600 uppercase tracking-wider mb-2 flex items-center gap-2"><i class="material-icons text-indigo-400 text-sm">payments</i> Total Revenue</div>
+      <div class="text-4xl font-extrabold text-indigo-950" [appCountUp]="stats.revenue" prefix="$"></div>
+    </div>
+    <div class="glass-card rounded-2xl p-6 stagger-item flex flex-col justify-center">
+      <div class="text-sm font-bold text-indigo-600 uppercase tracking-wider mb-2 flex items-center gap-2"><i class="material-icons text-indigo-400 text-sm">book_online</i> Bookings</div>
+      <div class="text-4xl font-extrabold text-indigo-950" [appCountUp]="stats.totalBookings"></div>
+    </div>
+    <div class="glass-card rounded-2xl p-6 stagger-item flex flex-col justify-center">
+      <div class="text-sm font-bold text-indigo-600 uppercase tracking-wider mb-2 flex items-center gap-2"><i class="material-icons text-indigo-400 text-sm">flight_land</i> Arrivals Today</div>
+      <div class="text-4xl font-extrabold text-emerald-600" [appCountUp]="stats.arrivalsToday"></div>
+    </div>
+    <div class="glass-card rounded-2xl p-6 stagger-item flex flex-col justify-center">
+      <div class="text-sm font-bold text-indigo-600 uppercase tracking-wider mb-2 flex items-center gap-2"><i class="material-icons text-indigo-400 text-sm">flight_takeoff</i> Departures Today</div>
+      <div class="text-4xl font-extrabold text-rose-600" [appCountUp]="stats.departuresToday"></div>
+    </div>
+  </div>
+
+  <!-- Charts Grid -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Revenue Trend Chart -->
+    <div class="glass-card rounded-2xl p-6 stagger-item">
+      <h3 class="text-lg font-bold text-indigo-950 mb-6 flex items-center gap-2"><i class="material-icons text-indigo-400">trending_up</i> Revenue Trend</h3>
+      <div class="h-64 w-full relative">
+        <canvas baseChart
+          [data]="lineChartData"
+          [options]="lineChartOptions"
+          [type]="'line'">
+        </canvas>
+      </div>
+    </div>
+
+    <!-- Occupancy by Room Type Chart -->
+    <div class="glass-card rounded-2xl p-6 stagger-item">
+      <h3 class="text-lg font-bold text-indigo-950 mb-6 flex items-center gap-2"><i class="material-icons text-indigo-400">bar_chart</i> Occupancy by Room Type</h3>
+      <div class="h-64 w-full relative">
+        <canvas baseChart
+          [data]="barChartData"
+          [options]="barChartOptions"
+          [type]="'bar'">
+        </canvas>
+      </div>
+    </div>
+  </div>
+</div>

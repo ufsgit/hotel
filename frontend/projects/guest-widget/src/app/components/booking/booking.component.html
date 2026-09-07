@@ -1,0 +1,96 @@
+<div class="max-w-4xl mx-auto px-4 py-12 animate-fade-in">
+  <div class="glass-card rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(8,_112,_184,_0.07)] border border-white/60">
+    <div class="p-8 md:p-10">
+      <div class="mb-10 text-center animate-slide-up">
+        <h2 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-600 tracking-tight">Complete Your Booking</h2>
+        <p class="text-gray-500 mt-2 font-medium">Review your details and confirm your reservation.</p>
+      </div>
+
+      <form (ngSubmit)="submitBooking()" #bookingForm="ngForm" class="space-y-8 animate-slide-up delay-100">
+        <!-- Guest Details -->
+        <div class="bg-white/50 backdrop-blur rounded-xl p-6 border border-gray-100 shadow-sm">
+          <h3 class="text-lg font-bold text-gray-800 mb-5 flex items-center gap-2"><i class="material-icons text-[var(--primary-color,theme(colors.blue.600))]">person</i> Guest Information</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Full Name</label>
+              <input type="text" [(ngModel)]="bookingData.guest_name" name="guest_name" required
+                     class="w-full bg-white/80 border border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,theme(colors.blue.500))] focus:border-transparent transition-all shadow-sm">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Email Address</label>
+              <input type="email" [(ngModel)]="bookingData.guest_email" name="guest_email" required
+                     class="w-full bg-white/80 border border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,theme(colors.blue.500))] focus:border-transparent transition-all shadow-sm">
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Phone Number</label>
+              <input type="tel" [(ngModel)]="bookingData.guest_phone" name="guest_phone"
+                     class="w-full bg-white/80 border border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,theme(colors.blue.500))] focus:border-transparent transition-all shadow-sm">
+            </div>
+          </div>
+        </div>
+
+        <!-- Price Summary & Promo -->
+        <div class="bg-slate-50/50 backdrop-blur rounded-xl p-6 border border-slate-200/60 shadow-sm relative overflow-hidden">
+          <h3 class="text-lg font-bold text-gray-800 mb-5 relative z-10 flex items-center gap-2"><i class="material-icons text-[var(--primary-color,theme(colors.slate.800))]">receipt_long</i> Price Summary</h3>
+          
+          <div class="flex gap-3 mb-6 relative z-10">
+            <input type="text" [(ngModel)]="bookingData.promo_code" name="promo_code" placeholder="Have a promo code?"
+                   class="flex-1 bg-white border border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,theme(colors.slate.800))] shadow-sm font-medium">
+            <button type="button" (click)="calculatePrice()" [disabled]="isCalculating"
+                    class="bg-white border border-[var(--primary-color,theme(colors.slate.800))] text-[var(--primary-color,theme(colors.slate.800))] hover:bg-slate-50 font-bold py-3 px-6 rounded-lg transition-colors shadow-sm disabled:opacity-50">
+              Apply
+            </button>
+          </div>
+
+          <div *ngIf="pricing" class="space-y-3 text-sm relative z-10 bg-white/80 p-5 rounded-xl border border-gray-100 shadow-sm">
+            <div class="flex justify-between text-gray-600 font-medium"><span class="flex items-center gap-1"><i class="material-icons text-[14px]">hotel</i> Base Price ({{ bookingData.guests }} Guests)</span> <span>${{ pricing.subtotal }}</span></div>
+            <div *ngIf="pricing.discount > 0" class="flex justify-between text-emerald-600 font-bold"><span class="flex items-center gap-1"><i class="material-icons text-[14px]">local_offer</i> Discount</span> <span>-${{ pricing.discount }}</span></div>
+            <div class="flex justify-between text-gray-600 font-medium"><span class="flex items-center gap-1"><i class="material-icons text-[14px]">account_balance</i> Taxes</span> <span>${{ pricing.taxAmount }}</span></div>
+            <div class="pt-4 border-t border-gray-200/80 flex justify-between font-extrabold text-xl text-gray-900 mt-3">
+              <span>Total Amount</span>
+              <span class="text-[var(--primary-color,theme(colors.slate.900))]">${{ pricing.totalAmount }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white/50 backdrop-blur rounded-xl p-6 border border-gray-100 shadow-sm">
+          <h3 class="text-lg font-bold text-gray-800 mb-5 flex items-center gap-2"><i class="material-icons text-[var(--primary-color,theme(colors.blue.600))]">payment</i> Payment Options</h3>
+          <div class="space-y-3">
+            <label class="flex items-center p-4 border border-gray-200 bg-white/60 rounded-xl cursor-pointer hover:border-[var(--primary-color,theme(colors.blue.400))] hover:bg-blue-50/50 transition-all shadow-sm">
+              <input type="radio" [(ngModel)]="bookingData.paymentOption" name="paymentOption" value="pay_full" class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300">
+              <div class="ml-4">
+                <span class="block text-sm font-bold text-gray-900">Pay Now (Full Amount)</span>
+                <span class="block text-xs text-gray-500 mt-0.5">Secure online payment via Razorpay.</span>
+              </div>
+            </label>
+            <label class="flex items-center p-4 border border-gray-200 bg-white/60 rounded-xl cursor-pointer hover:border-[var(--primary-color,theme(colors.blue.400))] hover:bg-blue-50/50 transition-all shadow-sm">
+              <input type="radio" [(ngModel)]="bookingData.paymentOption" name="paymentOption" value="pay_partial" class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300">
+              <div class="ml-4">
+                <span class="block text-sm font-bold text-gray-900">Pay 50% Advance</span>
+                <span class="block text-xs text-gray-500 mt-0.5">Pay half now to confirm, rest at the hotel.</span>
+              </div>
+            </label>
+            <label class="flex items-center p-4 border border-gray-200 bg-white/60 rounded-xl cursor-pointer hover:border-[var(--primary-color,theme(colors.blue.400))] hover:bg-blue-50/50 transition-all shadow-sm">
+              <input type="radio" [(ngModel)]="bookingData.paymentOption" name="paymentOption" value="pay_later" class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300">
+              <div class="ml-4">
+                <span class="block text-sm font-bold text-gray-900">Pay at Hotel</span>
+                <span class="block text-xs text-gray-500 mt-0.5">Reserve now and pay when you arrive.</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="mt-8 flex justify-end gap-4 animate-slide-up delay-300">
+          <button type="button" routerLink="/rooms" class="px-8 py-3 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
+            Back
+          </button>
+          <button type="submit" [disabled]="isSubmitting || isCalculating"
+                  class="flex-1 bg-gradient-to-r from-[var(--primary-color,theme(colors.slate.800))] to-slate-900 hover:from-slate-700 hover:to-slate-800 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg hover:shadow-slate-500/30 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:hover:translate-y-0 flex items-center justify-center gap-2">
+            <i *ngIf="isSubmitting" class="material-icons animate-spin text-lg">autorenew</i>
+            {{ isSubmitting ? 'Processing...' : (bookingData.paymentOption === 'pay_later' ? 'Confirm Reservation' : 'Proceed to Payment') }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

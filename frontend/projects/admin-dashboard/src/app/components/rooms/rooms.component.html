@@ -1,0 +1,68 @@
+<div class="mb-6 flex justify-between items-center">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">Room Management</h1>
+    <p class="text-gray-600 mt-1">Add or edit hotel room types and pricing.</p>
+  </div>
+  <button (click)="openNewForm()" *ngIf="!showForm" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors shadow-sm">
+    + Add Room
+  </button>
+</div>
+
+<div *ngIf="showForm" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+  <h2 class="text-xl font-bold mb-4">{{ isEditing ? 'Edit Room' : 'New Room' }}</h2>
+  <form (ngSubmit)="saveRoom()" class="space-y-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Room Name</label>
+        <input type="text" [(ngModel)]="formData.name" name="name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Base Price ($)</label>
+        <input type="number" [(ngModel)]="formData.base_price" name="price" required class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Default Capacity</label>
+        <input type="number" [(ngModel)]="formData.default_capacity" name="default_capacity" required class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Max Capacity</label>
+        <input type="number" [(ngModel)]="formData.max_capacity" name="max_capacity" required class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+        <textarea [(ngModel)]="formData.description" name="description" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+      </div>
+      <div class="md:col-span-2 flex items-center">
+        <input type="checkbox" [(ngModel)]="formData.extra_bed_allowed" name="extra_bed" id="extra_bed" class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+        <label for="extra_bed" class="ml-2 block text-sm text-gray-900">Allow Extra Bed</label>
+      </div>
+    </div>
+    <div class="flex justify-end gap-3 mt-6">
+      <button type="button" (click)="cancelForm()" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Cancel</button>
+      <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Save Room</button>
+    </div>
+  </form>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" *ngIf="!showForm">
+  <div *ngIf="isLoading" class="col-span-full text-center py-8 text-gray-500">Loading rooms...</div>
+  <div *ngIf="!isLoading && rooms.length === 0" class="col-span-full text-center py-8 text-gray-500 bg-white rounded-xl shadow-sm border border-gray-200">No rooms found.</div>
+  
+  <div *ngFor="let room of rooms" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+    <div class="p-5 flex-1">
+      <div class="flex justify-between items-start mb-2">
+        <h3 class="text-lg font-bold text-gray-900">{{ room.name }}</h3>
+        <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded">${{ room.base_price }}/nt</span>
+      </div>
+      <p class="text-sm text-gray-600 line-clamp-2 mb-4">{{ room.description }}</p>
+      <div class="text-sm text-gray-500 space-y-1">
+        <p><span class="font-medium text-gray-700">Capacity:</span> {{ room.default_capacity }} (Max: {{ room.max_capacity }})</p>
+        <p *ngIf="room.extra_bed_allowed" class="text-green-600">✓ Extra bed allowed</p>
+      </div>
+    </div>
+    <div class="bg-gray-50 p-3 border-t border-gray-200 flex gap-2">
+      <button (click)="openEditForm(room)" class="flex-1 bg-white border border-gray-300 text-gray-700 py-1.5 rounded text-sm hover:bg-gray-100 transition">Edit</button>
+      <button (click)="deleteRoom(room.id)" class="flex-1 bg-white border border-red-300 text-red-600 py-1.5 rounded text-sm hover:bg-red-50 transition">Delete</button>
+    </div>
+  </div>
+</div>

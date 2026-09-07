@@ -1,0 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+:root {
+  --primary-color: #30a37f; /* Rich Indigo */
+  --font-family: 'Inter', sans-serif;
+}
+
+body {
+  font-family: var(--font-family);
+  background: #fafafa;
+  min-height: 100vh;
+  color: #1b4b39; /* Deep Indigo for base text */
+}
+
+/* Minimal Utilities */
+@layer utilities {
+  .glass {
+    @apply bg-white border border-gray-200/60 shadow-sm;
+  }
+  .glass-dark {
+    @apply bg-gray-900 border border-gray-800 shadow-sm text-white;
+  }
+  .glass-card {
+    @apply bg-white border border-gray-100 shadow-sm hover:shadow transition-all duration-200 ease-out;
+  }
+}
+
+/* Custom Animations */
+@keyframes slideUp {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+/* Delay utilities */
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }

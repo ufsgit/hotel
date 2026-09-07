@@ -1,0 +1,63 @@
+<div class="h-screen flex bg-transparent font-sans overflow-hidden">
+  <!-- Sidebar -->
+  <aside class="glass flex flex-col transition-all duration-300 border-r border-slate-200/50 z-20" [ngClass]="{'w-64': !isSidebarCollapsed, 'w-20': isSidebarCollapsed}">
+    <div class="h-16 flex items-center justify-center border-b border-slate-200/50 relative">
+      <h1 *ngIf="!isSidebarCollapsed" class="text-2xl font-bold text-indigo-950 tracking-tight whitespace-nowrap animate-fade-in">Hotel Admin</h1>
+      <h1 *ngIf="isSidebarCollapsed" class="text-2xl font-bold text-indigo-950 tracking-tight animate-fade-in">H</h1>
+    </div>
+    
+    <nav class="flex-1 py-6 px-3 space-y-2 overflow-y-auto overflow-x-hidden">
+      <a routerLink="/dashboard" routerLinkActive="bg-indigo-700 text-white font-medium shadow-md" class="flex items-center px-3 py-3 rounded-xl text-sm text-indigo-900/70 hover:bg-indigo-50 transition-all group" [ngClass]="{'justify-center': isSidebarCollapsed}">
+        <i class="material-icons text-xl" [ngClass]="{'mr-3': !isSidebarCollapsed}">dashboard</i>
+        <span *ngIf="!isSidebarCollapsed" class="whitespace-nowrap animate-fade-in">Dashboard</span>
+      </a>
+      <a routerLink="/calendar" routerLinkActive="bg-indigo-700 text-white font-medium shadow-md" class="flex items-center px-3 py-3 rounded-xl text-sm text-indigo-900/70 hover:bg-indigo-50 transition-all group" [ngClass]="{'justify-center': isSidebarCollapsed}">
+        <i class="material-icons text-xl" [ngClass]="{'mr-3': !isSidebarCollapsed}">calendar_month</i>
+        <span *ngIf="!isSidebarCollapsed" class="whitespace-nowrap animate-fade-in">Calendar</span>
+      </a>
+      <a routerLink="/reservations" routerLinkActive="bg-indigo-700 text-white font-medium shadow-md" class="flex items-center px-3 py-3 rounded-xl text-sm text-indigo-900/70 hover:bg-indigo-50 transition-all group" [ngClass]="{'justify-center': isSidebarCollapsed}">
+        <i class="material-icons text-xl" [ngClass]="{'mr-3': !isSidebarCollapsed}">list_alt</i>
+        <span *ngIf="!isSidebarCollapsed" class="whitespace-nowrap animate-fade-in">Reservations</span>
+      </a>
+      <a routerLink="/rooms" routerLinkActive="bg-indigo-700 text-white font-medium shadow-md" class="flex items-center px-3 py-3 rounded-xl text-sm text-indigo-900/70 hover:bg-indigo-50 transition-all group" [ngClass]="{'justify-center': isSidebarCollapsed}">
+        <i class="material-icons text-xl" [ngClass]="{'mr-3': !isSidebarCollapsed}">king_bed</i>
+        <span *ngIf="!isSidebarCollapsed" class="whitespace-nowrap animate-fade-in">Rooms</span>
+      </a>
+      <a routerLink="/offers" routerLinkActive="bg-indigo-700 text-white font-medium shadow-md" class="flex items-center px-3 py-3 rounded-xl text-sm text-indigo-900/70 hover:bg-indigo-50 transition-all group" [ngClass]="{'justify-center': isSidebarCollapsed}">
+        <i class="material-icons text-xl" [ngClass]="{'mr-3': !isSidebarCollapsed}">local_offer</i>
+        <span *ngIf="!isSidebarCollapsed" class="whitespace-nowrap animate-fade-in">Seasons & Offers</span>
+      </a>
+    </nav>
+
+    <div class="p-3 border-t border-slate-200/50">
+      <button (click)="logout()" class="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium py-2.5 rounded-xl transition-all shadow-sm flex items-center justify-center">
+        <i class="material-icons text-xl" [ngClass]="{'mr-2': !isSidebarCollapsed}">logout</i>
+        <span *ngIf="!isSidebarCollapsed" class="whitespace-nowrap animate-fade-in">Logout</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="flex-1 flex flex-col h-full bg-transparent overflow-hidden">
+    <!-- Topbar -->
+    <header class="h-16 glass flex items-center justify-between px-6 border-b border-slate-200/50 z-10 shadow-sm transition-all duration-300">
+      <div class="flex items-center gap-4">
+        <button (click)="toggleSidebar()" class="text-slate-500 hover:text-indigo-950 focus:outline-none p-1 rounded-md hover:bg-indigo-50 transition-colors">
+          <i class="material-icons text-2xl">menu</i>
+        </button>
+        <div class="text-xl font-extrabold text-indigo-950 tracking-tight hidden sm:block">Grand Oasis Hotel</div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-full bg-indigo-700 text-white flex items-center justify-center shadow-lg font-bold">A</div>
+        <span class="text-sm font-bold text-indigo-900 hidden sm:block">Admin User</span>
+      </div>
+    </header>
+
+    <!-- Page Content -->
+    <div class="flex-1 overflow-y-auto p-4 sm:p-8 relative z-0">
+      <div class="animate-fade-in relative z-10">
+        <router-outlet></router-outlet>
+      </div>
+    </div>
+  </main>
+</div>

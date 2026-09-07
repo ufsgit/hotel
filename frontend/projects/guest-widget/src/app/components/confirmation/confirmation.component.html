@@ -1,0 +1,21 @@
+<div class="max-w-xl mx-auto bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden text-center p-10 mt-12">
+  <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+    <svg class="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+    </svg>
+  </div>
+  
+  <h2 class="text-3xl font-bold text-gray-800 mb-2">Booking Confirmed!</h2>
+  <p class="text-gray-600 mb-8">Thank you, {{ guestName }}. Your reservation has been successfully placed.</p>
+  
+  <div class="bg-gray-50 rounded-lg p-6 border border-gray-200 mb-8">
+    <p class="text-sm text-gray-500 uppercase tracking-wider mb-1">Booking Reference</p>
+    <p class="text-2xl font-bold font-mono text-[var(--primary-color,theme(colors.blue.600))]">{{ reference }}</p>
+  </div>
+
+  <p class="text-sm text-gray-500 mb-8">We have sent a confirmation email with your booking details.</p>
+
+  <a routerLink="/" class="inline-block bg-[var(--primary-color,theme(colors.blue.600))] hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition-colors shadow-md">
+    Back to Home
+  </a>
+</div>
