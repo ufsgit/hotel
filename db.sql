@@ -21,7 +21,7 @@ SET @@SESSION.SQL_LOG_BIN= 0;
 -- GTID state at the beginning of the backup 
 --
 
-SET @@GLOBAL.GTID_PURGED=/*!80000 '+'*/ '35f1f18e-371f-11f1-80d5-5cb47e3771c9:1-31750';
+SET @@GLOBAL.GTID_PURGED=/*!80000 '+'*/ '35f1f18e-371f-11f1-80d5-5cb47e3771c9:1-31752';
 
 --
 -- Table structure for table `bookings`
@@ -311,4 +311,4 @@ SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-09 15:25:07
+-- Dump completed on 2026-09-09 16:04:56
