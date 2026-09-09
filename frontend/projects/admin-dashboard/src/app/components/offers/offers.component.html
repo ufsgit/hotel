@@ -50,10 +50,39 @@
           class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm resize-none"></textarea>
       </div>
 
-      <div class="sm:col-span-2">
-        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Banner Image URL</label>
-        <input type="url" [(ngModel)]="formData.banner_image_url" placeholder="https://..."
-          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm">
+      <!-- Banner Image Upload & Preview Section -->
+      <div class="sm:col-span-2 bg-gray-50 p-4 rounded-xl border border-gray-200">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Offer Banner Image</label>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+          <div>
+            <label class="block text-xs text-gray-500 font-semibold mb-1">Upload File</label>
+            <input type="file" (change)="onFileSelected($event)" accept="image/*"
+              class="block w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+            <p *ngIf="isUploading" class="text-xs text-indigo-600 mt-1 animate-pulse font-medium">Uploading banner image...</p>
+
+            <div class="relative flex py-2 items-center">
+              <div class="flex-grow border-t border-gray-200"></div>
+              <span class="flex-shrink mx-2 text-[10px] text-gray-400 font-bold uppercase">or enter URL</span>
+              <div class="flex-grow border-t border-gray-200"></div>
+            </div>
+
+            <input type="url" [(ngModel)]="formData.banner_image_url" placeholder="https://... or upload above"
+              class="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-xs">
+          </div>
+
+          <!-- Banner Preview -->
+          <div>
+            <label class="block text-xs text-gray-500 font-semibold mb-1">Banner Preview</label>
+            <div class="h-28 rounded-xl border-2 border-dashed border-gray-300 bg-white overflow-hidden flex items-center justify-center relative">
+              <img *ngIf="formData.banner_image_url" [src]="formData.banner_image_url" alt="Banner Preview" class="w-full h-full object-cover">
+              <div *ngIf="!formData.banner_image_url" class="text-center text-gray-400 p-2">
+                <svg class="w-7 h-7 mx-auto mb-1 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                <span class="text-[11px]">No banner image selected</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div>
@@ -103,14 +132,14 @@
     </div>
 
     <div class="flex gap-3 pt-2">
-      <button (click)="saveOffer()" [disabled]="isSaving"
-        class="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-bold py-2.5 rounded-xl transition-all text-sm">
+      <button (click)="saveOffer()" [disabled]="isSaving || isUploading"
+        class="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-bold py-2.5 rounded-xl transition-all text-sm cursor-pointer disabled:cursor-not-allowed">
         <span *ngIf="isSaving" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
         <i class="material-icons text-base" *ngIf="!isSaving">{{ isEditing ? 'save' : 'add' }}</i>
         {{ isSaving ? 'Saving...' : (isEditing ? 'Save Changes' : 'Create Offer') }}
       </button>
       <button (click)="cancelForm()"
-        class="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-semibold transition-all">
+        class="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-semibold transition-all cursor-pointer">
         Cancel
       </button>
     </div>

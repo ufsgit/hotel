@@ -20,6 +20,7 @@ export class OffersComponent implements OnInit {
 
   showForm  = false;
   isEditing = false;
+  isUploading = false;
 
   emptyForm = () => ({
     name: '',
@@ -67,6 +68,24 @@ export class OffersComponent implements OnInit {
       end_date:   offer.end_date   ? offer.end_date.split('T')[0]   : ''
     };
     this.showForm = true;
+  }
+
+  onFileSelected(event: any): void {
+    const file: File = event.target.files[0];
+    if (file) {
+      this.isUploading = true;
+      this.api.uploadOfferBanner(file).subscribe({
+        next: (res) => {
+          this.formData.banner_image_url = res.url;
+          this.isUploading = false;
+        },
+        error: (err) => {
+          console.error('Upload failed', err);
+          this.isUploading = false;
+          alert('Failed to upload image. Please try again.');
+        }
+      });
+    }
   }
 
   cancelForm(): void {

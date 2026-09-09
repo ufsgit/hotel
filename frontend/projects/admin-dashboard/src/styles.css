@@ -28,6 +28,30 @@ body {
   }
 }
 
+/* Sidebar Nav Links */
+.sidebar-link {
+  color: #475569;
+  transition: all 0.2s ease-in-out;
+}
+.sidebar-link:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+.sidebar-link.active-link {
+  background-color: #0070cc !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(0, 112, 204, 0.3) !important;
+  font-weight: 600 !important;
+}
+.sidebar-link.active-link:hover {
+  background-color: #005bb0 !important;
+  color: #ffffff !important;
+}
+.sidebar-link.active-link i,
+.sidebar-link.active-link span {
+  color: #ffffff !important;
+}
+
 /* Custom Animations */
 @keyframes slideUp {
   0% { opacity: 0; transform: translateY(20px); }

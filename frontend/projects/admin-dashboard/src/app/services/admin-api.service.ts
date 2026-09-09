@@ -95,4 +95,12 @@ export class AdminApiService {
     const headers = new HttpHeaders({ 'Authorization': `Bearer ${token}` });
     return this.http.post<{ url: string }>(`${this.baseUrl}/upload-room-photo`, formData, { headers });
   }
+
+  uploadOfferBanner(file: File): Observable<{ url: string }> {
+    const formData = new FormData();
+    formData.append('banner', file);
+    const token = localStorage.getItem('token');
+    const headers = new HttpHeaders({ 'Authorization': `Bearer ${token}` });
+    return this.http.post<{ url: string }>(`${this.baseUrl}/upload-offer-banner`, formData, { headers });
+  }
 }

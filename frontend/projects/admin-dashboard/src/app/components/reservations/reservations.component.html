@@ -67,9 +67,10 @@
             </span>
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-            <div class="flex gap-2 items-center">
+            <div class="flex gap-2 items-end flex-wrap">
+              <!-- Booking Status -->
               <div>
-                <label class="block text-[10px] text-gray-400 font-bold uppercase">Booking</label>
+                <label class="block text-[10px] text-gray-400 font-bold uppercase mb-0.5">Booking</label>
                 <select [ngModel]="booking.booking_status" (ngModelChange)="updateStatus(booking, $event)" class="bg-gray-50 border border-gray-300 text-gray-900 text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5">
                   <option value="pending">Pending</option>
                   <option value="confirmed">Confirm</option>
@@ -78,13 +79,28 @@
                   <option value="cancelled">Cancel</option>
                 </select>
               </div>
+              <!-- Payment Status -->
               <div>
-                <label class="block text-[10px] text-gray-400 font-bold uppercase">Payment</label>
+                <label class="block text-[10px] text-gray-400 font-bold uppercase mb-0.5">Payment</label>
                 <select [ngModel]="booking.payment_status || 'unpaid'" (ngModelChange)="updatePaymentStatus(booking, $event)" class="bg-gray-50 border border-gray-300 text-gray-900 text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5">
                   <option value="unpaid">Pay at Hotel</option>
                   <option value="partial">Partial</option>
                   <option value="paid">Paid</option>
                 </select>
+              </div>
+              <!-- Received Amount — only shown for partial -->
+              <div *ngIf="booking.payment_status === 'partial'" class="flex items-end gap-1">
+                <div>
+                  <label class="block text-[10px] text-gray-400 font-bold uppercase mb-0.5">Received ($)</label>
+                  <input type="number" min="0" [max]="booking.total_amount"
+                    [(ngModel)]="partialAmounts[booking.id]"
+                    placeholder="0.00"
+                    class="w-24 bg-blue-50 border border-blue-300 text-gray-900 text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5 outline-none">
+                </div>
+                <button (click)="updatePartialAmount(booking)"
+                  class="mb-0.5 px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors">
+                  Save
+                </button>
               </div>
             </div>
           </td>

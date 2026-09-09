@@ -97,12 +97,23 @@ router.get('/bookings', async (req, res) => {
 
 router.put('/bookings/:id/status', async (req, res) => {
     try {
-        const { booking_status, payment_status } = req.body;
-        await pool.query(
-            'UPDATE bookings SET booking_status = COALESCE(?, booking_status), payment_status = COALESCE(?, payment_status) WHERE id = ? AND hotel_id = ?',
-            [booking_status, payment_status, req.params.id, req.user.hotel_id]
-        );
-        
+        const { booking_status, payment_status, amount_paid } = req.body;
+
+        // Build dynamic SET clause
+        const fields = [];
+        const values = [];
+        if (booking_status !== undefined) { fields.push('booking_status = ?'); values.push(booking_status); }
+        if (payment_status !== undefined) { fields.push('payment_status = ?'); values.push(payment_status); }
+        if (amount_paid !== undefined)    { fields.push('amount_paid = ?');    values.push(amount_paid); }
+
+        if (fields.length > 0) {
+            values.push(req.params.id, req.user.hotel_id);
+            await pool.query(
+                `UPDATE bookings SET ${fields.join(', ')} WHERE id = ? AND hotel_id = ?`,
+                values
+            );
+        }
+
         if (booking_status === 'cancelled') {
             const [bookings] = await pool.query('SELECT guest_email FROM bookings WHERE id = ?', [req.params.id]);
             if (bookings.length > 0) {
@@ -110,7 +121,7 @@ router.put('/bookings/:id/status', async (req, res) => {
                 await notificationService.sendCancellationAlert(req.params.id, bookings[0].guest_email);
             }
         }
-        
+
         res.json({ message: 'Booking status updated' });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -145,6 +156,39 @@ router.post('/upload-room-photo', uploadRoomPhoto.single('photo'), async (req, r
         const protocol = req.protocol;
         const photoUrl = `${protocol}://${host}/uploads/rooms/${req.file.filename}`;
         res.json({ url: photoUrl });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Multer config — store offer banners in /uploads/offers/
+const offerStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const dir = path.join(__dirname, '../../uploads/offers');
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        cb(null, `offer_${Date.now()}${ext}`);
+    }
+});
+const uploadOfferBanner = multer({
+    storage: offerStorage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) cb(null, true);
+        else cb(new Error('Only image files are allowed'));
+    }
+});
+
+router.post('/upload-offer-banner', uploadOfferBanner.single('banner'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+        const host = req.get('host');
+        const protocol = req.protocol;
+        const bannerUrl = `${protocol}://${host}/uploads/offers/${req.file.filename}`;
+        res.json({ url: bannerUrl });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -214,7 +258,7 @@ router.get('/reports/stats', async (req, res) => {
         const [revRow] = await pool.query(
             `SELECT COALESCE(SUM(CASE 
                 WHEN payment_status = 'paid' THEN total_amount 
-                WHEN payment_status = 'partial' THEN total_amount / 2 
+                WHEN payment_status = 'partial' THEN COALESCE(amount_paid, 0)
                 ELSE 0 
             END), 0) as revenue FROM bookings WHERE hotel_id = ? AND booking_status != 'cancelled'`,
             [hotelId]
@@ -229,11 +273,11 @@ router.get('/reports/stats', async (req, res) => {
         // Total bookings
         const [bkRow] = await pool.query(`SELECT COUNT(*) as total_bookings FROM bookings WHERE hotel_id = ?`, [hotelId]);
         
-        // Arrivals today
-        const [arrRow] = await pool.query(`SELECT COUNT(*) as arrivals FROM bookings WHERE hotel_id = ? AND check_in_date = CURDATE()`, [hotelId]);
+        // Checked In Today (bookings with status 'checked_in' and check_in_date = today)
+        const [arrRow] = await pool.query(`SELECT COUNT(*) as arrivals FROM bookings WHERE hotel_id = ? AND booking_status = 'checked_in' AND check_in_date = CURDATE()`, [hotelId]);
         
-        // Departures today
-        const [depRow] = await pool.query(`SELECT COUNT(*) as departures FROM bookings WHERE hotel_id = ? AND check_out_date = CURDATE()`, [hotelId]);
+        // Checked Out Today (bookings with status 'checked_out' and check_out_date = today)
+        const [depRow] = await pool.query(`SELECT COUNT(*) as departures FROM bookings WHERE hotel_id = ? AND booking_status = 'checked_out' AND check_out_date = CURDATE()`, [hotelId]);
 
         // 7-Day Revenue Trend
         const [revTrendRows] = await pool.query(`
