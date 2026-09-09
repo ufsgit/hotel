@@ -38,7 +38,7 @@ const STORAGE_KEY_BAR  = 'dashboard_bar_chart';
   ]
 })
 export class DashboardComponent implements OnInit {
-  stats: any = { revenue: 0, totalBookings: 0, arrivalsToday: 0, departuresToday: 0 };
+  stats: any = { revenue: 0, expectedRevenue: 0, totalBookings: 0, arrivalsToday: 0, departuresToday: 0 };
   isLoading = true;
 
   // ── Edit panel toggles ──────────────────────────────────────────────────────
