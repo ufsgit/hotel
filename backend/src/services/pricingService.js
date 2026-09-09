@@ -1,7 +1,7 @@
 const pool = require('../config/db');
 
 async function calculatePrice(hotel_id, room_type_id, check_in, check_out, guests, promo_code_str = null) {
-    const [roomTypes] = await pool.query('SELECT base_price, extra_bed_price, default_capacity FROM room_types WHERE id = ?', [room_type_id]);
+    const [roomTypes] = await pool.query('SELECT base_price, extra_bed_price, max_occupancy FROM room_types WHERE id = ?', [room_type_id]);
     if (roomTypes.length === 0) throw new Error('Room type not found');
     const room = roomTypes[0];
 
@@ -15,9 +15,10 @@ async function calculatePrice(hotel_id, room_type_id, check_in, check_out, guest
     
     // Extra beds
     let extraBeds = 0;
-    if (guests > room.default_capacity) {
-        extraBeds = guests - room.default_capacity;
-        baseTotal += (extraBeds * room.extra_bed_price * nights);
+    const capacity = room.max_occupancy || 2;
+    if (guests > capacity) {
+        extraBeds = guests - capacity;
+        baseTotal += (extraBeds * (room.extra_bed_price || 0) * nights);
     }
 
     let subtotal = baseTotal;

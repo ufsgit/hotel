@@ -1,33 +1,141 @@
-<div class="mb-6 flex justify-between items-center">
+<div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
   <div>
     <h1 class="text-2xl font-bold text-gray-900">Booking Calendar</h1>
-    <p class="text-gray-600 mt-1">Visualize your room occupancy over time.</p>
+    <p class="text-gray-600 mt-1">Visualize room occupancy and upcoming reservations.</p>
+  </div>
+
+  <div class="flex items-center gap-3 bg-white p-1.5 rounded-xl border border-gray-200 shadow-sm">
+    <button (click)="prevMonth()" class="p-2 hover:bg-gray-100 rounded-lg text-gray-600 transition flex items-center justify-center">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    </button>
+    
+    <span class="font-bold text-gray-800 px-3 min-w-[140px] text-center">
+      {{ monthNames[currentMonth] }} {{ currentYear }}
+    </span>
+
+    <button (click)="nextMonth()" class="p-2 hover:bg-gray-100 rounded-lg text-gray-600 transition flex items-center justify-center">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+    </button>
+
+    <button (click)="goToToday()" class="ml-2 px-3 py-1.5 bg-blue-50 text-blue-600 font-semibold text-xs rounded-lg hover:bg-blue-100 transition">
+      Today
+    </button>
   </div>
 </div>
 
-<div *ngIf="isLoading" class="text-center py-10 text-gray-500">Loading calendar...</div>
+<!-- Loading state -->
+<div *ngIf="isLoading" class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center text-gray-500">
+  <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mb-3"></div>
+  <p>Loading calendar data...</p>
+</div>
 
-<div *ngIf="!isLoading" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-  <table class="w-full text-left border-collapse min-w-[1000px]">
-    <thead>
-      <tr>
-        <th class="p-4 border-b border-gray-200 bg-gray-50 text-sm font-semibold text-gray-700 w-48 sticky left-0 z-10">Room Type</th>
-        <th *ngFor="let day of days" class="p-2 border-b border-gray-200 bg-gray-50 text-xs font-semibold text-gray-500 text-center min-w-[40px]">{{ day }}</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let room of rooms" class="hover:bg-gray-50">
-        <td class="p-4 border-b border-gray-200 text-sm font-medium text-gray-900 sticky left-0 bg-white z-10 shadow-[1px_0_0_0_#e5e7eb]">{{ room }}</td>
-        
-        <td *ngFor="let day of days" class="p-1 border-b border-gray-200 border-r border-gray-100 relative h-12 text-center">
-          <!-- Real booking blocks -->
-          <div *ngIf="hasBooking(room, day) as booking" 
-               class="absolute inset-x-1 inset-y-1 bg-blue-500 rounded text-white text-[10px] p-1 overflow-hidden whitespace-nowrap z-0 shadow-sm cursor-pointer hover:bg-blue-600"
-               title="{{ booking.guest_name }} - {{ booking.booking_status }}">
-            {{ booking.guest_name }}
-          </div>
-        </td>
-      </tr>
-    </tbody>
-  </table>
+<!-- Calendar Grid -->
+<div *ngIf="!isLoading" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-left border-collapse min-w-[1100px]">
+      <thead>
+        <tr class="bg-gray-50 border-b border-gray-200">
+          <th class="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider w-48 sticky left-0 z-20 bg-gray-50 shadow-[1px_0_0_0_#e5e7eb]">
+            Room Type
+          </th>
+          <th *ngFor="let day of monthDays" 
+              class="p-2 text-center min-w-[42px] border-r border-gray-200"
+              [ngClass]="{'bg-blue-50/70 text-blue-700': day.isToday}">
+            <div class="text-[10px] font-medium uppercase text-gray-400" [ngClass]="{'text-blue-500 font-bold': day.isToday}">
+              {{ day.dayName }}
+            </div>
+            <div class="text-xs font-extrabold mt-0.5" [ngClass]="{'text-blue-600': day.isToday, 'text-gray-700': !day.isToday}">
+              {{ day.dayNumber }}
+            </div>
+          </th>
+        </tr>
+      </thead>
+
+      <tbody class="divide-y divide-gray-200">
+        <tr *ngFor="let room of roomTypes" class="hover:bg-gray-50/50 transition">
+          <td class="p-4 text-sm font-semibold text-gray-900 sticky left-0 bg-white z-10 shadow-[1px_0_0_0_#e5e7eb] flex flex-col justify-center">
+            <span>{{ room.name }}</span>
+            <span class="text-[11px] font-normal text-gray-400">${{ room.base_price || 0 }}/night</span>
+          </td>
+
+          <td *ngFor="let day of monthDays" 
+              class="p-1 border-r border-gray-100 relative h-14 text-center align-middle"
+              [ngClass]="{'bg-blue-50/20': day.isToday}">
+            
+            <div *ngIf="getBookingForRoomAndDay(room, day.dateStr) as booking"
+                 (click)="selectBooking(booking)"
+                 class="h-10 rounded-md text-white text-[11px] font-medium px-2 flex items-center justify-between cursor-pointer transition-all shadow-sm overflow-hidden"
+                 [ngClass]="{
+                   'bg-emerald-600 hover:bg-emerald-700': booking.booking_status === 'confirmed',
+                   'bg-blue-600 hover:bg-blue-700': booking.booking_status === 'checked_in',
+                   'bg-amber-500 hover:bg-amber-600': booking.booking_status === 'pending',
+                   'bg-gray-500 hover:bg-gray-600': booking.booking_status === 'checked_out'
+                 }"
+                 [title]="booking.guest_name + ' (' + booking.booking_status + ')'">
+              
+              <span *ngIf="isFirstDayOfBooking(booking, day.dateStr)" class="truncate font-semibold flex items-center gap-1">
+                <svg class="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
+                {{ booking.guest_name }}
+              </span>
+              <span *ngIf="!isFirstDayOfBooking(booking, day.dateStr)" class="opacity-60 text-[10px] w-full text-center">• • •</span>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Booking Detail Modal -->
+<div *ngIf="selectedBooking" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl animate-fade-in relative">
+    <button (click)="closeModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1 rounded-lg">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+
+    <div class="flex items-center gap-3 mb-5">
+      <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 font-bold flex items-center justify-center text-lg">
+        {{ selectedBooking.guest_name ? selectedBooking.guest_name.charAt(0) : 'G' }}
+      </div>
+      <div>
+        <h3 class="text-lg font-bold text-gray-900">{{ selectedBooking.guest_name }}</h3>
+        <p class="text-xs text-gray-500">Booking Ref: BKG-{{ selectedBooking.id }}</p>
+      </div>
+    </div>
+
+    <div class="space-y-3 bg-gray-50 p-4 rounded-xl text-sm mb-6">
+      <div class="flex justify-between"><span class="text-gray-500">Room Type</span> <span class="font-semibold text-gray-900">{{ selectedBooking.room_type }}</span></div>
+      <div class="flex justify-between"><span class="text-gray-500">Check In</span> <span class="font-semibold text-gray-900">{{ parseDateStr(selectedBooking.check_in_date) }}</span></div>
+      <div class="flex justify-between"><span class="text-gray-500">Check Out</span> <span class="font-semibold text-gray-900">{{ parseDateStr(selectedBooking.check_out_date) }}</span></div>
+      <div class="flex justify-between"><span class="text-gray-500">Booking Status</span> 
+        <span class="px-2.5 py-0.5 text-xs font-bold rounded-full capitalize"
+              [ngClass]="{
+                'bg-green-100 text-green-800': selectedBooking.booking_status === 'confirmed',
+                'bg-yellow-100 text-yellow-800': selectedBooking.booking_status === 'pending',
+                'bg-blue-100 text-blue-800': selectedBooking.booking_status === 'checked_in'
+              }">
+          {{ selectedBooking.booking_status }}
+        </span>
+      </div>
+      <div class="flex justify-between"><span class="text-gray-500">Payment Status</span> 
+        <span class="px-2.5 py-0.5 text-xs font-bold rounded-full capitalize"
+              [ngClass]="{
+                'bg-green-100 text-green-800': selectedBooking.payment_status === 'paid',
+                'bg-amber-100 text-amber-800': selectedBooking.payment_status === 'unpaid' || !selectedBooking.payment_status
+              }">
+          {{ selectedBooking.payment_status === 'paid' ? 'Paid' : 'Pay at Hotel' }}
+        </span>
+      </div>
+      <div class="flex justify-between pt-2 border-t border-gray-200 font-bold text-gray-900">
+        <span>Total Amount</span>
+        <span>${{ selectedBooking.total_amount }}</span>
+      </div>
+    </div>
+
+    <div class="flex justify-end">
+      <button (click)="closeModal()" class="px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition">
+        Close
+      </button>
+    </div>
+  </div>
 </div>

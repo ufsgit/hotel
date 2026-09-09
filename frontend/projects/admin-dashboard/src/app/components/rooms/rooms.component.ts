@@ -15,13 +15,15 @@ export class RoomsComponent implements OnInit {
 
   showForm = false;
   isEditing = false;
+  isUploading = false;
   formData: any = {
     name: '',
     description: '',
     base_price: 0,
     default_capacity: 2,
     max_capacity: 4,
-    extra_bed_allowed: false
+    extra_bed_allowed: false,
+    cover_image: ''
   };
 
   constructor(private api: AdminApiService) {}
@@ -46,13 +48,34 @@ export class RoomsComponent implements OnInit {
 
   openNewForm(): void {
     this.isEditing = false;
-    this.formData = { name: '', description: '', base_price: 0, default_capacity: 2, max_capacity: 4, extra_bed_allowed: false };
+    this.formData = { 
+      name: '', 
+      description: '', 
+      base_price: 0, 
+      default_capacity: 2, 
+      max_capacity: 4, 
+      extra_bed_allowed: false,
+      cover_image: '' 
+    };
     this.showForm = true;
   }
 
   openEditForm(room: any): void {
     this.isEditing = true;
-    this.formData = { ...room };
+    let cover = '';
+    if (room.photos) {
+      if (Array.isArray(room.photos) && room.photos.length > 0) {
+        cover = room.photos[0];
+      } else if (typeof room.photos === 'string') {
+        try {
+          const parsed = JSON.parse(room.photos);
+          cover = Array.isArray(parsed) ? parsed[0] : room.photos;
+        } catch (e) {
+          cover = room.photos;
+        }
+      }
+    }
+    this.formData = { ...room, cover_image: cover };
     this.showForm = true;
   }
 
@@ -60,14 +83,52 @@ export class RoomsComponent implements OnInit {
     this.showForm = false;
   }
 
+  onFileSelected(event: any): void {
+    const file: File = event.target.files[0];
+    if (file) {
+      this.isUploading = true;
+      this.api.uploadRoomPhoto(file).subscribe({
+        next: (res) => {
+          this.formData.cover_image = res.url;
+          this.isUploading = false;
+        },
+        error: (err) => {
+          console.error('Upload failed', err);
+          this.isUploading = false;
+          alert('Failed to upload image. Please try again.');
+        }
+      });
+    }
+  }
+
+  getRoomPhoto(room: any): string {
+    if (room.photos) {
+      if (Array.isArray(room.photos) && room.photos.length > 0) return room.photos[0];
+      if (typeof room.photos === 'string') {
+        try {
+          const parsed = JSON.parse(room.photos);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed[0];
+        } catch (e) {
+          return room.photos;
+        }
+      }
+    }
+    return '';
+  }
+
   saveRoom(): void {
+    const payload = {
+      ...this.formData,
+      photos: this.formData.cover_image ? [this.formData.cover_image] : []
+    };
+
     if (this.isEditing) {
-      this.api.updateRoomType(this.formData.id, this.formData).subscribe(() => {
+      this.api.updateRoomType(this.formData.id, payload).subscribe(() => {
         this.loadRooms();
         this.showForm = false;
       });
     } else {
-      this.api.createRoomType(this.formData).subscribe(() => {
+      this.api.createRoomType(payload).subscribe(() => {
         this.loadRooms();
         this.showForm = false;
       });

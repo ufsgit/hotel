@@ -1,0 +1,168 @@
+<div class="mb-6 flex items-center gap-3">
+  <i class="material-icons text-indigo-500 text-4xl">settings</i>
+  <h2 class="text-3xl font-extrabold text-indigo-950 tracking-tight">Hotel Settings</h2>
+</div>
+
+<!-- Loading -->
+<div *ngIf="isLoading" class="flex justify-center py-16">
+  <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+</div>
+
+<div *ngIf="!isLoading" class="max-w-2xl space-y-6">
+
+  <!-- Success / Error Banner -->
+  <div *ngIf="successMsg"
+    class="flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold px-4 py-3 rounded-xl shadow-sm">
+    <i class="material-icons text-emerald-500">check_circle</i> {{ successMsg }}
+  </div>
+  <div *ngIf="errorMsg"
+    class="flex items-center gap-3 bg-rose-50 border border-rose-200 text-rose-700 font-semibold px-4 py-3 rounded-xl shadow-sm">
+    <i class="material-icons text-rose-500">error</i> {{ errorMsg }}
+  </div>
+
+  <!-- ── Section: Basic Info ─────────────────────────────────────────────── -->
+  <div class="glass-card rounded-2xl p-6 space-y-5">
+    <h3 class="text-base font-bold text-indigo-950 uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
+      <i class="material-icons text-indigo-400" style="font-size:20px">business</i> Basic Information
+    </h3>
+
+    <div>
+      <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Hotel Name</label>
+      <input type="text" [(ngModel)]="formData.name" placeholder="e.g. Grand Oasis Hotel"
+        class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none text-sm font-medium text-gray-800 transition-shadow">
+    </div>
+
+    <div>
+      <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Address</label>
+      <textarea [(ngModel)]="formData.address" rows="2" placeholder="123 Palm Ave, Beach City"
+        class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none text-sm text-gray-800 resize-none transition-shadow"></textarea>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Contact Email</label>
+        <input type="email" [(ngModel)]="formData.contact_email" placeholder="contact@hotel.com"
+          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm font-medium text-gray-800 transition-shadow">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Contact Phone</label>
+        <input type="tel" [(ngModel)]="formData.contact_phone" placeholder="+1 234 567 890"
+          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm font-medium text-gray-800 transition-shadow">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Timezone</label>
+      <select [(ngModel)]="formData.timezone"
+        class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm font-medium text-gray-800 bg-white transition-shadow">
+        <option *ngFor="let tz of timezones" [value]="tz">{{ tz }}</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- ── Section: Branding ──────────────────────────────────────────────── -->
+  <div class="glass-card rounded-2xl p-6 space-y-5">
+    <h3 class="text-base font-bold text-indigo-950 uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
+      <i class="material-icons text-indigo-400" style="font-size:20px">palette</i> Branding
+    </h3>
+
+    <!-- Logo Upload -->
+    <div>
+      <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Hotel Logo</label>
+
+      <!-- Current logo preview -->
+      <div *ngIf="logoPreview" class="flex items-center gap-4 mb-4 p-3 bg-gray-50 rounded-xl border border-gray-100">
+        <img [src]="logoPreview" alt="Logo Preview"
+          class="h-20 w-20 rounded-xl object-cover border-2 border-indigo-100 shadow-sm">
+        <div class="flex-1">
+          <p class="text-sm font-semibold text-gray-700">Current Logo</p>
+          <p class="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{{ formData.branding_logo_url || 'Local preview (not saved yet)' }}</p>
+        </div>
+        <button (click)="removeLogo()"
+          class="w-8 h-8 rounded-lg flex items-center justify-center text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-all">
+          <i class="material-icons" style="font-size:18px">delete</i>
+        </button>
+      </div>
+
+      <!-- Drop zone -->
+      <div
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave()"
+        (drop)="onDrop($event)"
+        [ngClass]="isDragging
+          ? 'border-indigo-500 bg-indigo-50 scale-[1.01]'
+          : 'border-gray-200 bg-gray-50 hover:bg-indigo-50/50 hover:border-indigo-300'"
+        class="relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 cursor-pointer group"
+        (click)="logoInput.click()">
+
+        <input #logoInput type="file" accept="image/*" class="hidden" (change)="onFileSelected($event)">
+
+        <div class="flex flex-col items-center gap-2 pointer-events-none">
+          <div class="w-14 h-14 rounded-2xl bg-indigo-100 flex items-center justify-center mb-1 group-hover:bg-indigo-200 transition-colors">
+            <i class="material-icons text-indigo-500 text-3xl">cloud_upload</i>
+          </div>
+          <p class="text-sm font-bold text-gray-700">
+            {{ isDragging ? 'Drop your logo here!' : 'Drag & drop your logo here' }}
+          </p>
+          <p class="text-xs text-gray-400">or <span class="text-indigo-600 font-semibold">click to browse</span></p>
+          <p class="text-xs text-gray-300 mt-1">JPG, PNG, GIF, WebP · Max 5 MB</p>
+        </div>
+      </div>
+
+      <!-- Upload error -->
+      <p *ngIf="uploadError" class="mt-2 text-xs font-semibold text-rose-500 flex items-center gap-1">
+        <i class="material-icons" style="font-size:14px">warning</i> {{ uploadError }}
+      </p>
+
+      <!-- Selected file info + upload button -->
+      <div *ngIf="selectedFile && !isUploading" class="mt-3 flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+        <i class="material-icons text-blue-400">image</i>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-semibold text-gray-700 truncate">{{ selectedFile.name }}</p>
+          <p class="text-xs text-gray-400">{{ (selectedFile.size / 1024).toFixed(0) }} KB · Ready to upload</p>
+        </div>
+        <button (click)="uploadLogo()"
+          class="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1.5 px-4 rounded-lg text-xs transition-colors shadow-sm">
+          <i class="material-icons" style="font-size:14px">upload</i> Upload
+        </button>
+      </div>
+
+      <!-- Uploading spinner -->
+      <div *ngIf="isUploading" class="mt-3 flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+        <div class="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        <span class="text-sm font-semibold text-indigo-700">Uploading logo...</span>
+      </div>
+
+      <!-- Or use a URL manually -->
+      <div class="mt-4">
+        <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Or paste a logo URL</label>
+        <input type="url" [(ngModel)]="formData.branding_logo_url" placeholder="https://example.com/logo.png"
+          (input)="logoPreview = formData.branding_logo_url || null"
+          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm font-medium text-gray-600 transition-shadow">
+      </div>
+    </div>
+
+    <!-- Primary colour -->
+    <div>
+      <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Primary Brand Colour</label>
+      <div class="flex items-center gap-3">
+        <input type="color" [(ngModel)]="formData.branding_primary_color"
+          class="h-10 w-14 rounded-lg border border-gray-200 cursor-pointer p-0.5">
+        <input type="text" [(ngModel)]="formData.branding_primary_color" placeholder="#008cff"
+          class="w-32 px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm font-mono font-bold text-gray-800 transition-shadow">
+        <span class="text-xs text-gray-400">Shown in the guest booking widget</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Save Button ─────────────────────────────────────────────────────── -->
+  <div class="flex justify-end">
+    <button (click)="save()" [disabled]="isSaving"
+      class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-md shadow-indigo-200 text-sm">
+      <i class="material-icons text-base" *ngIf="!isSaving">save</i>
+      <span *ngIf="isSaving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+      {{ isSaving ? 'Saving...' : 'Save Settings' }}
+    </button>
+  </div>
+
+</div>

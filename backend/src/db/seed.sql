@@ -7,9 +7,8 @@ VALUES ('Grand Oasis Hotel', 'grand-oasis', '123 Palm Ave, Beach City', 'contact
 SET @hotel_id = LAST_INSERT_ID();
 
 -- Insert Admin User (password is 'password123' hashed with bcrypt)
--- Note: bcrypt hash for 'password123' is $2a$10$X8O.U/w2yM/L4sR.5C6.Ou1k/H0i1G/J5aN9wKqH/N.uK.B8bVn0e
 INSERT INTO users (hotel_id, name, email, password_hash, role)
-VALUES (@hotel_id, 'Admin User', 'admin@grandoasis.com', '$2a$10$X8O.U/w2yM/L4sR.5C6.Ou1k/H0i1G/J5aN9wKqH/N.uK.B8bVn0e', 'owner');
+VALUES (@hotel_id, 'Admin User', 'admin@grandoasis.com', '$2b$10$FHJBqkA8ngO4yAM1t5mHS.tdGMigMJ5LOGWmDgtRm7.2nljGhIOy6', 'owner');
 
 -- Insert Room Types
 INSERT INTO room_types (hotel_id, name, description, max_occupancy, extra_bed_allowed, extra_bed_price, base_price, photos, amenities, total_rooms)

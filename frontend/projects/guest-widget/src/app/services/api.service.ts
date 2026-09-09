@@ -15,7 +15,7 @@ export class ApiService {
   }
 
   getActiveOffers(slug: string): Observable<any[]> {
-    return this.http.get<any[]>(`${this.baseUrl}/hotels/${slug}/active-offers`);
+    return this.http.get<any[]>(`${this.baseUrl}/hotels/${slug}/offers`);
   }
 
   getAvailability(slug: string, checkIn: string, checkOut: string, guests: number): Observable<any[]> {

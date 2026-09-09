@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule } from '@angular/router';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-layout',
@@ -11,15 +12,13 @@ import { RouterModule, Router } from '@angular/router';
 export class LayoutComponent {
   isSidebarCollapsed = false;
 
-  constructor(private router: Router) {}
+  constructor(private authService: AuthService) {}
   
   toggleSidebar() {
     this.isSidebarCollapsed = !this.isSidebarCollapsed;
   }
 
   logout() {
-    // Basic logout logic for scaffold
-    localStorage.removeItem('token');
-    this.router.navigate(['/login']);
+    this.authService.logout();
   }
 }

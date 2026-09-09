@@ -31,8 +31,8 @@ export class ReservationsComponent implements OnInit {
         this.isLoading = false;
         // Mock data for scaffold if API fails (e.g. no DB connection yet)
         this.bookings = [
-          { id: 1, guest_name: 'John Doe', check_in_date: '2026-09-10', check_out_date: '2026-09-15', booking_status: 'confirmed', total_amount: 550 },
-          { id: 2, guest_name: 'Jane Smith', check_in_date: '2026-09-12', check_out_date: '2026-09-14', booking_status: 'pending', total_amount: 220 }
+          { id: 1, guest_name: 'John Doe', check_in_date: '2026-09-10', check_out_date: '2026-09-15', booking_status: 'confirmed', payment_status: 'paid', total_amount: 550 },
+          { id: 2, guest_name: 'Jane Smith', check_in_date: '2026-09-12', check_out_date: '2026-09-14', booking_status: 'pending', payment_status: 'unpaid', total_amount: 220 }
         ];
       }
     });
@@ -45,8 +45,19 @@ export class ReservationsComponent implements OnInit {
       },
       error: (err) => {
         console.error('Update failed', err);
-        // Fallback for scaffold
         booking.booking_status = newStatus;
+      }
+    });
+  }
+
+  updatePaymentStatus(booking: any, newPaymentStatus: string): void {
+    this.api.updateBookingStatus(booking.id, { payment_status: newPaymentStatus }).subscribe({
+      next: () => {
+        booking.payment_status = newPaymentStatus;
+      },
+      error: (err) => {
+        console.error('Update payment status failed', err);
+        booking.payment_status = newPaymentStatus;
       }
     });
   }

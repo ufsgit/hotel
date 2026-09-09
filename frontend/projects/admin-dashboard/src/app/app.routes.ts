@@ -6,18 +6,22 @@ import { ReservationsComponent } from './components/reservations/reservations.co
 import { OffersComponent } from './components/offers/offers.component';
 import { RoomsComponent } from './components/rooms/rooms.component';
 import { CalendarComponent } from './components/calendar/calendar.component';
+import { SettingsComponent } from './components/settings/settings.component';
+import { authGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
   { 
     path: '', 
     component: LayoutComponent,
+    canActivate: [authGuard],
     children: [
       { path: 'dashboard', component: DashboardComponent },
       { path: 'calendar', component: CalendarComponent },
       { path: 'reservations', component: ReservationsComponent },
       { path: 'offers', component: OffersComponent },
       { path: 'rooms', component: RoomsComponent },
+      { path: 'settings', component: SettingsComponent },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
     ]
   },

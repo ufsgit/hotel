@@ -1,6 +1,11 @@
 <div class="mb-6 flex justify-between items-center">
-  <h2 class="text-3xl font-extrabold text-indigo-950 tracking-tight">Dashboard Overview</h2>
-  <div class="text-sm text-indigo-600 font-medium">Last 7 Days</div>
+  <h2 class="text-3xl font-extrabold text-indigo-950 tracking-tight flex items-center gap-3">
+    <i class="material-icons text-indigo-500 text-4xl">hotel</i>
+    Dashboard Overview
+  </h2>
+  <div class="text-sm bg-indigo-50 text-indigo-600 font-semibold px-4 py-1.5 rounded-full border border-indigo-100 flex items-center gap-1">
+    <i class="material-icons" style="font-size:14px">date_range</i> Last 7 Days
+  </div>
 </div>
 
 <div *ngIf="isLoading" class="flex justify-center py-12">
@@ -10,47 +15,165 @@
 <div *ngIf="!isLoading" @staggerList class="space-y-6">
   <!-- Stats Grid -->
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-    <div class="glass-card rounded-2xl p-6 stagger-item flex flex-col justify-center">
-      <div class="text-sm font-bold text-indigo-600 uppercase tracking-wider mb-2 flex items-center gap-2"><i class="material-icons text-indigo-400 text-sm">payments</i> Total Revenue</div>
-      <div class="text-4xl font-extrabold text-indigo-950" [appCountUp]="stats.revenue" prefix="$"></div>
+    <div class="glass-card rounded-2xl p-6 stagger-item flex items-center gap-4">
+      <div class="flex-shrink-0 w-14 h-14 rounded-xl bg-blue-50 flex items-center justify-center shadow-sm">
+        <i class="material-icons text-3xl text-blue-500">account_balance_wallet</i>
+      </div>
+      <div>
+        <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Total Revenue</div>
+        <div class="text-3xl font-extrabold text-indigo-950" [appCountUp]="stats.revenue" prefix="$"></div>
+      </div>
     </div>
-    <div class="glass-card rounded-2xl p-6 stagger-item flex flex-col justify-center">
-      <div class="text-sm font-bold text-indigo-600 uppercase tracking-wider mb-2 flex items-center gap-2"><i class="material-icons text-indigo-400 text-sm">book_online</i> Bookings</div>
-      <div class="text-4xl font-extrabold text-indigo-950" [appCountUp]="stats.totalBookings"></div>
+    <div class="glass-card rounded-2xl p-6 stagger-item flex items-center gap-4">
+      <div class="flex-shrink-0 w-14 h-14 rounded-xl bg-purple-50 flex items-center justify-center shadow-sm">
+        <i class="material-icons text-3xl text-purple-500">confirmation_number</i>
+      </div>
+      <div>
+        <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Bookings</div>
+        <div class="text-3xl font-extrabold text-indigo-950" [appCountUp]="stats.totalBookings"></div>
+      </div>
     </div>
-    <div class="glass-card rounded-2xl p-6 stagger-item flex flex-col justify-center">
-      <div class="text-sm font-bold text-indigo-600 uppercase tracking-wider mb-2 flex items-center gap-2"><i class="material-icons text-indigo-400 text-sm">flight_land</i> Arrivals Today</div>
-      <div class="text-4xl font-extrabold text-emerald-600" [appCountUp]="stats.arrivalsToday"></div>
+    <div class="glass-card rounded-2xl p-6 stagger-item flex items-center gap-4">
+      <div class="flex-shrink-0 w-14 h-14 rounded-xl bg-emerald-50 flex items-center justify-center shadow-sm">
+        <i class="material-icons text-3xl text-emerald-500">login</i>
+      </div>
+      <div>
+        <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Arrivals Today</div>
+        <div class="text-3xl font-extrabold text-emerald-600" [appCountUp]="stats.arrivalsToday"></div>
+      </div>
     </div>
-    <div class="glass-card rounded-2xl p-6 stagger-item flex flex-col justify-center">
-      <div class="text-sm font-bold text-indigo-600 uppercase tracking-wider mb-2 flex items-center gap-2"><i class="material-icons text-indigo-400 text-sm">flight_takeoff</i> Departures Today</div>
-      <div class="text-4xl font-extrabold text-rose-600" [appCountUp]="stats.departuresToday"></div>
+    <div class="glass-card rounded-2xl p-6 stagger-item flex items-center gap-4">
+      <div class="flex-shrink-0 w-14 h-14 rounded-xl bg-rose-50 flex items-center justify-center shadow-sm">
+        <i class="material-icons text-3xl text-rose-500">logout</i>
+      </div>
+      <div>
+        <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Departures Today</div>
+        <div class="text-3xl font-extrabold text-rose-600" [appCountUp]="stats.departuresToday"></div>
+      </div>
     </div>
   </div>
 
   <!-- Charts Grid -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <!-- Revenue Trend Chart -->
+
+    <!-- ── Revenue Trend Chart ──────────────────────────────────────────────── -->
     <div class="glass-card rounded-2xl p-6 stagger-item">
-      <h3 class="text-lg font-bold text-indigo-950 mb-6 flex items-center gap-2"><i class="material-icons text-indigo-400">trending_up</i> Revenue Trend</h3>
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-indigo-950 flex items-center gap-2">
+          <span class="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
+            <i class="material-icons text-blue-500" style="font-size:20px">show_chart</i>
+          </span>
+          Revenue Trend
+        </h3>
+        <button (click)="toggleLineEditor()"
+          class="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all"
+          [ngClass]="showLineEditor
+            ? 'bg-blue-600 text-white border-blue-600 shadow'
+            : 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50'">
+          <i class="material-icons" style="font-size:15px">{{ showLineEditor ? 'close' : 'edit' }}</i>
+          {{ showLineEditor ? 'Close' : 'Edit Data' }}
+        </button>
+      </div>
+
+      <!-- Line Chart Editor Panel -->
+      <div *ngIf="showLineEditor" @slideDown
+        class="mb-4 bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-3">
+        <p class="text-xs font-bold text-blue-700 uppercase tracking-wider">Edit Revenue Data Points</p>
+
+        <div class="space-y-2 max-h-52 overflow-y-auto pr-1">
+          <div *ngFor="let val of lineValues; let i = index; trackBy: trackByIndex"
+            class="flex items-center gap-2">
+            <input type="text" [(ngModel)]="lineLabels[i]" placeholder="Label"
+              class="w-24 text-sm px-3 py-1.5 rounded-lg border border-blue-200 focus:ring-2 focus:ring-blue-400 outline-none bg-white font-medium">
+            <input type="number" [(ngModel)]="lineValues[i]" placeholder="Value"
+              class="flex-1 text-sm px-3 py-1.5 rounded-lg border border-blue-200 focus:ring-2 focus:ring-blue-400 outline-none bg-white">
+            <button (click)="removeLinePoint(i)" [disabled]="lineValues.length <= 2"
+              class="w-7 h-7 rounded-lg flex items-center justify-center text-rose-400 hover:bg-rose-100 hover:text-rose-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+              <i class="material-icons" style="font-size:16px">delete</i>
+            </button>
+          </div>
+        </div>
+
+        <button (click)="addLinePoint()"
+          class="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+          <i class="material-icons" style="font-size:16px">add_circle_outline</i> Add Data Point
+        </button>
+
+        <div class="flex gap-2 pt-1">
+          <button (click)="applyLineChart()"
+            class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors shadow-sm flex items-center justify-center gap-1">
+            <i class="material-icons" style="font-size:16px">check</i> Apply
+          </button>
+          <button (click)="resetLineChart()"
+            class="px-4 py-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-medium transition-colors flex items-center gap-1">
+            <i class="material-icons" style="font-size:16px">restart_alt</i> Reset
+          </button>
+        </div>
+      </div>
+
       <div class="h-64 w-full relative">
-        <canvas baseChart
-          [data]="lineChartData"
-          [options]="lineChartOptions"
-          [type]="'line'">
-        </canvas>
+        <canvas baseChart [data]="lineChartData" [options]="lineChartOptions" [type]="'line'"></canvas>
       </div>
     </div>
 
-    <!-- Occupancy by Room Type Chart -->
+    <!-- ── Occupancy by Room Type Chart ────────────────────────────────────── -->
     <div class="glass-card rounded-2xl p-6 stagger-item">
-      <h3 class="text-lg font-bold text-indigo-950 mb-6 flex items-center gap-2"><i class="material-icons text-indigo-400">bar_chart</i> Occupancy by Room Type</h3>
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-indigo-950 flex items-center gap-2">
+          <span class="w-9 h-9 rounded-lg bg-orange-50 flex items-center justify-center">
+            <i class="material-icons text-orange-500" style="font-size:20px">king_bed</i>
+          </span>
+          Occupancy by Room Type
+        </h3>
+        <button (click)="toggleBarEditor()"
+          class="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all"
+          [ngClass]="showBarEditor
+            ? 'bg-orange-500 text-white border-orange-500 shadow'
+            : 'bg-white text-orange-500 border-orange-200 hover:bg-orange-50'">
+          <i class="material-icons" style="font-size:15px">{{ showBarEditor ? 'close' : 'edit' }}</i>
+          {{ showBarEditor ? 'Close' : 'Edit Data' }}
+        </button>
+      </div>
+
+      <!-- Bar Chart Editor Panel -->
+      <div *ngIf="showBarEditor" @slideDown
+        class="mb-4 bg-orange-50 border border-orange-100 rounded-xl p-4 space-y-3">
+        <p class="text-xs font-bold text-orange-700 uppercase tracking-wider">Edit Occupancy Data Points</p>
+
+        <div class="space-y-2 max-h-52 overflow-y-auto pr-1">
+          <div *ngFor="let val of barValues; let i = index; trackBy: trackByIndex"
+            class="flex items-center gap-2">
+            <input type="text" [(ngModel)]="barLabels[i]" placeholder="Room Type"
+              class="w-28 text-sm px-3 py-1.5 rounded-lg border border-orange-200 focus:ring-2 focus:ring-orange-400 outline-none bg-white font-medium">
+            <input type="number" [(ngModel)]="barValues[i]" placeholder="%" min="0" max="100"
+              class="flex-1 text-sm px-3 py-1.5 rounded-lg border border-orange-200 focus:ring-2 focus:ring-orange-400 outline-none bg-white">
+            <span class="text-xs text-gray-400 font-semibold">%</span>
+            <button (click)="removeBarPoint(i)" [disabled]="barValues.length <= 1"
+              class="w-7 h-7 rounded-lg flex items-center justify-center text-rose-400 hover:bg-rose-100 hover:text-rose-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+              <i class="material-icons" style="font-size:16px">delete</i>
+            </button>
+          </div>
+        </div>
+
+        <button (click)="addBarPoint()"
+          class="flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-800 transition-colors">
+          <i class="material-icons" style="font-size:16px">add_circle_outline</i> Add Room Type
+        </button>
+
+        <div class="flex gap-2 pt-1">
+          <button (click)="applyBarChart()"
+            class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors shadow-sm flex items-center justify-center gap-1">
+            <i class="material-icons" style="font-size:16px">check</i> Apply
+          </button>
+          <button (click)="resetBarChart()"
+            class="px-4 py-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-medium transition-colors flex items-center gap-1">
+            <i class="material-icons" style="font-size:16px">restart_alt</i> Reset
+          </button>
+        </div>
+      </div>
+
       <div class="h-64 w-full relative">
-        <canvas baseChart
-          [data]="barChartData"
-          [options]="barChartOptions"
-          [type]="'bar'">
-        </canvas>
+        <canvas baseChart [data]="barChartData" [options]="barChartOptions" [type]="'bar'"></canvas>
       </div>
     </div>
   </div>

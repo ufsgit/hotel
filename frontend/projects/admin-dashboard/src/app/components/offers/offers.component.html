@@ -1,51 +1,217 @@
 <div class="mb-6 flex justify-between items-center">
   <div>
-    <h1 class="text-2xl font-bold text-gray-900">Seasons & Offers</h1>
-    <p class="text-gray-600 mt-1">Manage seasonal discounts and promotional banners.</p>
+    <h1 class="text-3xl font-extrabold text-indigo-950 tracking-tight flex items-center gap-3">
+      <i class="material-icons text-indigo-500 text-4xl">local_offer</i> Seasons &amp; Offers
+    </h1>
+    <p class="text-gray-500 mt-1 text-sm">Manage seasonal discounts and promotional banners shown in the guest booking widget.</p>
   </div>
-  <button class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors shadow-sm">
-    + New Offer
+  <button (click)="openNewForm()"
+    class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-5 rounded-xl transition-all shadow-md shadow-indigo-200 text-sm">
+    <i class="material-icons text-base">add</i> New Offer
   </button>
 </div>
 
-<div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-  <div *ngFor="let offer of offers" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-    <!-- Live Preview Banner -->
-    <div class="h-32 bg-gray-900 relative">
-      <img [src]="offer.banner_image_url" alt="Banner Preview" class="absolute inset-0 w-full h-full object-cover opacity-60">
-      <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <h3 class="text-white text-2xl font-bold">{{ offer.name }}</h3>
+<!-- Session error banner -->
+<div *ngIf="pageError"
+  class="mb-4 flex items-center gap-3 bg-rose-50 border border-rose-200 text-rose-700 font-semibold px-4 py-3 rounded-xl shadow-sm">
+  <i class="material-icons text-rose-500">lock</i>
+  {{ pageError }}
+  <a routerLink="/login" class="ml-auto underline text-rose-600 font-bold text-sm">Log in again</a>
+</div>
+
+<!-- ── Create / Edit Form Modal ──────────────────────────────────────────────── -->
+<div *ngIf="showForm"
+  class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+  (click)="cancelForm()">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4"
+    (click)="$event.stopPropagation()">
+
+    <h2 class="text-xl font-extrabold text-indigo-950 flex items-center gap-2">
+      <i class="material-icons text-indigo-400">{{ isEditing ? 'edit' : 'add_circle_outline' }}</i>
+      {{ isEditing ? 'Edit Offer' : 'New Offer' }}
+    </h2>
+
+    <!-- Form validation error -->
+    <div *ngIf="formError"
+      class="flex items-center gap-2 bg-rose-50 border border-rose-200 text-rose-600 text-sm font-semibold px-3 py-2 rounded-xl">
+      <i class="material-icons text-rose-400" style="font-size:16px">warning</i> {{ formError }}
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="sm:col-span-2">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Offer Name</label>
+        <input type="text" [(ngModel)]="formData.name" placeholder="Summer Special"
+          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm font-medium">
       </div>
-      <div class="absolute top-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-        Live Preview
+
+      <div class="sm:col-span-2">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Description</label>
+        <textarea [(ngModel)]="formData.description" rows="2" placeholder="e.g. Get 20% off your stay!"
+          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm resize-none"></textarea>
+      </div>
+
+      <div class="sm:col-span-2">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Banner Image URL</label>
+        <input type="url" [(ngModel)]="formData.banner_image_url" placeholder="https://..."
+          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm">
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Discount Type</label>
+        <select [(ngModel)]="formData.discount_type"
+          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm bg-white">
+          <option value="percent">Percentage (%)</option>
+          <option value="flat">Flat Amount ($)</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
+          Discount Value ({{ formData.discount_type === 'percent' ? '%' : '$' }})
+        </label>
+        <input type="number" [(ngModel)]="formData.discount_value" min="0"
+          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm">
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Start Date</label>
+        <input type="date" [(ngModel)]="formData.start_date"
+          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm">
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">End Date</label>
+        <input type="date" [(ngModel)]="formData.end_date"
+          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm">
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Priority</label>
+        <input type="number" [(ngModel)]="formData.priority" min="0" max="100"
+          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm">
+      </div>
+
+      <div class="flex items-center gap-3 pt-4">
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" [(ngModel)]="formData.is_active" class="sr-only peer">
+          <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+        </label>
+        <span class="text-sm font-semibold" [ngClass]="formData.is_active ? 'text-green-600' : 'text-gray-400'">
+          {{ formData.is_active ? 'Active (visible in widget)' : 'Inactive' }}
+        </span>
       </div>
     </div>
-    
-    <div class="p-5 flex-1 flex flex-col">
-      <div class="flex justify-between items-start mb-4">
-        <div>
-          <h3 class="text-lg font-bold text-gray-900">{{ offer.name }}</h3>
-          <p class="text-sm text-gray-500 mt-1">Priority: {{ offer.priority }}</p>
+
+    <div class="flex gap-3 pt-2">
+      <button (click)="saveOffer()" [disabled]="isSaving"
+        class="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-bold py-2.5 rounded-xl transition-all text-sm">
+        <span *ngIf="isSaving" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+        <i class="material-icons text-base" *ngIf="!isSaving">{{ isEditing ? 'save' : 'add' }}</i>
+        {{ isSaving ? 'Saving...' : (isEditing ? 'Save Changes' : 'Create Offer') }}
+      </button>
+      <button (click)="cancelForm()"
+        class="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-semibold transition-all">
+        Cancel
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Loading ───────────────────────────────────────────────────────────────── -->
+<div *ngIf="isLoading" class="flex justify-center py-16">
+  <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+</div>
+
+<!-- ── Empty state ───────────────────────────────────────────────────────────── -->
+<div *ngIf="!isLoading && offers.length === 0"
+  class="flex flex-col items-center justify-center py-16 text-center glass-card rounded-2xl">
+  <i class="material-icons text-6xl text-indigo-200 mb-4">local_offer</i>
+  <h3 class="text-xl font-bold text-gray-500 mb-2">No offers yet</h3>
+  <p class="text-gray-400 text-sm mb-6">Create your first seasonal discount or promotional offer.</p>
+  <button (click)="openNewForm()"
+    class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition-all shadow-md">
+    <i class="material-icons text-base">add</i> Create First Offer
+  </button>
+</div>
+
+<!-- ── Offers grid ───────────────────────────────────────────────────────────── -->
+<div *ngIf="!isLoading && offers.length > 0" class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+  <div *ngFor="let offer of offers"
+    class="glass-card rounded-2xl overflow-hidden flex flex-col shadow-sm hover:shadow-md transition-shadow">
+
+    <!-- Banner preview -->
+    <div class="h-36 relative"
+      [style.background]="offer.is_active ? 'linear-gradient(135deg,#1e3a8a,#008cff)' : '#374151'">
+      <img *ngIf="offer.banner_image_url" [src]="offer.banner_image_url"
+        alt="Banner" class="absolute inset-0 w-full h-full object-cover"
+        [style.opacity]="offer.is_active ? '0.55' : '0.3'">
+      <div class="absolute inset-0 flex flex-col items-center justify-center text-white text-center px-4">
+        <span *ngIf="offer.is_active"
+          class="bg-emerald-400 text-white text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full mb-2 shadow">
+          ✓ Live in Widget
+        </span>
+        <span *ngIf="!offer.is_active"
+          class="bg-gray-500 text-white text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full mb-2">
+          Inactive
+        </span>
+        <h3 class="text-2xl font-extrabold drop-shadow-sm">{{ offer.name }}</h3>
+        <p class="text-sm opacity-80 mt-1">{{ offer.description }}</p>
+      </div>
+    </div>
+
+    <!-- Details -->
+    <div class="p-5 flex-1 flex flex-col gap-3">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl font-extrabold text-indigo-700">
+            {{ offer.discount_type === 'percent' ? offer.discount_value + '%' : '$' + offer.discount_value }}
+          </span>
+          <span class="text-xs text-gray-400 font-semibold">
+            {{ offer.discount_type === 'percent' ? 'percentage off' : 'flat discount' }}
+          </span>
         </div>
-        
-        <!-- Toggle Switch -->
-        <label class="relative inline-flex items-center cursor-pointer">
+        <span class="text-xs text-gray-400">Priority: {{ offer.priority }}</span>
+      </div>
+
+      <div class="text-xs text-gray-400 flex items-center gap-1.5">
+        <i class="material-icons" style="font-size:14px">date_range</i>
+        {{ offer.start_date | date:'mediumDate' }} → {{ offer.end_date | date:'mediumDate' }}
+      </div>
+
+      <div class="mt-auto flex items-center gap-3 pt-2 border-t border-gray-100">
+        <!-- Toggle -->
+        <label class="relative inline-flex items-center cursor-pointer" title="Toggle active in widget">
           <input type="checkbox" class="sr-only peer" [checked]="offer.is_active" (change)="toggleActive(offer)">
-          <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
-          <span class="ml-3 text-sm font-medium" [ngClass]="offer.is_active ? 'text-green-600' : 'text-gray-500'">
+          <div class="w-10 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+          <span class="ml-2 text-xs font-semibold" [ngClass]="offer.is_active ? 'text-green-600' : 'text-gray-400'">
             {{ offer.is_active ? 'Active' : 'Inactive' }}
           </span>
         </label>
-      </div>
 
-      <div class="bg-blue-50 text-blue-800 p-3 rounded-md text-sm font-medium mb-4">
-        Discount: {{ offer.discount_type === 'percent' ? offer.discount_value + '%' : '$' + offer.discount_value }}
-      </div>
-      
-      <div class="mt-auto flex gap-2">
-        <button class="flex-1 bg-white border border-gray-300 text-gray-700 py-2 rounded-md hover:bg-gray-50 transition text-sm font-medium">Edit</button>
-        <button class="flex-1 bg-white border border-red-300 text-red-600 py-2 rounded-md hover:bg-red-50 transition text-sm font-medium">Delete</button>
+        <div class="ml-auto flex gap-2">
+          <button (click)="openEditForm(offer)"
+            class="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-600 hover:bg-indigo-50 text-xs font-bold transition-all">
+            <i class="material-icons" style="font-size:14px">edit</i> Edit
+          </button>
+          <button (click)="deleteOffer(offer)"
+            class="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-rose-200 text-rose-500 hover:bg-rose-50 text-xs font-bold transition-all">
+            <i class="material-icons" style="font-size:14px">delete</i> Delete
+          </button>
+        </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ── How offers work info box ──────────────────────────────────────────────── -->
+<div *ngIf="!isLoading" class="mt-6 bg-blue-50 border border-blue-100 rounded-2xl p-4 flex gap-3">
+  <i class="material-icons text-blue-400 mt-0.5">info</i>
+  <div>
+    <p class="text-sm font-bold text-blue-800">How offers appear in the Guest Widget</p>
+    <p class="text-xs text-blue-600 mt-1">
+      Active offers with today's date in their range are shown as a full-width promotional banner at the top of the guest booking page.
+      The offer with the <strong>highest priority</strong> number is displayed first.
+      Inactive offers are hidden from guests but remain saved.
+    </p>
   </div>
 </div>
