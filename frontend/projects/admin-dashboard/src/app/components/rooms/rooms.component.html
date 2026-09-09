@@ -77,6 +77,60 @@
         <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
         <textarea [(ngModel)]="formData.description" name="description" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"></textarea>
       </div>
+
+      <!-- Room Amenities & Features Selector -->
+      <div class="md:col-span-2 bg-gray-50/80 p-5 rounded-xl border border-gray-200">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <label class="block text-sm font-bold text-gray-800">Room Amenities & Features</label>
+            <p class="text-xs text-gray-500">Select standard amenities or type custom ones (e.g. WiFi, TV, Balcony, Jacuzzi).</p>
+          </div>
+          <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">
+            {{ formData.amenities?.length || 0 }} Selected
+          </span>
+        </div>
+
+        <!-- Predefined & Custom Clickable Pills -->
+        <div class="flex flex-wrap gap-2 mb-4">
+          <button type="button" *ngFor="let am of availableAmenities"
+            (click)="toggleAmenity(am)"
+            class="text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer"
+            [ngClass]="isAmenitySelected(am)
+              ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+              : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400 hover:text-blue-600'">
+            <svg *ngIf="isAmenitySelected(am)" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            <svg *ngIf="!isAmenitySelected(am)" class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            {{ am }}
+          </button>
+        </div>
+
+        <!-- Add Custom Amenity Field -->
+        <div class="flex items-center gap-2 pt-3 border-t border-gray-200">
+          <div class="relative flex-1">
+            <input type="text" [(ngModel)]="customAmenityInput" name="customAmenityInput"
+              (keydown.enter)="$event.preventDefault(); addCustomAmenity()"
+              placeholder="Add custom option (e.g. Jacuzzi, Soundproofing, Kitchenette) & press Enter"
+              class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs bg-white">
+            <svg class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+          </div>
+          <button type="button" (click)="addCustomAmenity()"
+            class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm cursor-pointer">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Add Option
+          </button>
+        </div>
+
+        <!-- Selected Tags Preview -->
+        <div *ngIf="formData.amenities && formData.amenities.length > 0" class="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-gray-200">
+          <span class="text-xs text-gray-400 font-medium py-1 mr-1">Active on this room:</span>
+          <span *ngFor="let am of formData.amenities"
+            class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-md bg-blue-50 text-blue-800 border border-blue-200 shadow-2xs">
+            {{ am }}
+            <button type="button" (click)="removeAmenity(am)" class="hover:text-red-600 ml-1 font-bold text-sm cursor-pointer leading-none">×</button>
+          </span>
+        </div>
+      </div>
+
       <div class="md:col-span-2 flex items-center">
         <input type="checkbox" [(ngModel)]="formData.extra_bed_allowed" name="extra_bed" id="extra_bed" class="h-4 w-4 text-blue-600 border-gray-300 rounded">
         <label for="extra_bed" class="ml-2 block text-sm text-gray-900 font-medium">Allow Extra Bed</label>
@@ -84,8 +138,8 @@
     </div>
 
     <div class="flex justify-end gap-3 mt-6">
-      <button type="button" (click)="cancelForm()" class="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium">Cancel</button>
-      <button type="submit" [disabled]="isUploading" class="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium disabled:opacity-50">Save Room</button>
+      <button type="button" (click)="cancelForm()" class="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium cursor-pointer">Cancel</button>
+      <button type="submit" [disabled]="isUploading" class="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium disabled:opacity-50 cursor-pointer">Save Room</button>
     </div>
   </form>
 </div>
@@ -111,7 +165,16 @@
 
     <div class="p-5 flex-1 flex flex-col">
       <h3 class="text-lg font-bold text-gray-900 mb-1">{{ room.name }}</h3>
-      <p class="text-sm text-gray-600 line-clamp-2 mb-4">{{ room.description || 'No description provided.' }}</p>
+      <p class="text-sm text-gray-600 line-clamp-2 mb-3">{{ room.description || 'No description provided.' }}</p>
+
+      <!-- Amenities Badges on Card -->
+      <div *ngIf="parseAmenities(room.amenities).length > 0" class="flex flex-wrap gap-1 mb-3">
+        <span *ngFor="let am of parseAmenities(room.amenities)"
+          class="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100 flex items-center gap-1">
+          <svg class="w-2.5 h-2.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+          {{ am }}
+        </span>
+      </div>
       
       <div class="text-xs text-gray-500 space-y-1 mt-auto pt-3 border-t border-gray-100">
         <p><span class="font-medium text-gray-700">Capacity:</span> {{ room.default_capacity || room.max_occupancy || 2 }} guests (Max: {{ room.max_capacity || room.max_occupancy || 2 }})</p>
@@ -120,8 +183,8 @@
     </div>
 
     <div class="bg-gray-50 p-3 border-t border-gray-200 flex gap-2">
-      <button (click)="openEditForm(room)" class="flex-1 bg-white border border-gray-300 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-100 transition">Edit</button>
-      <button (click)="deleteRoom(room.id)" class="flex-1 bg-white border border-red-200 text-red-600 py-2 rounded-lg text-sm font-medium hover:bg-red-50 transition">Delete</button>
+      <button (click)="openEditForm(room)" class="flex-1 bg-white border border-gray-300 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-100 transition cursor-pointer">Edit</button>
+      <button (click)="deleteRoom(room.id)" class="flex-1 bg-white border border-red-200 text-red-600 py-2 rounded-lg text-sm font-medium hover:bg-red-50 transition cursor-pointer">Delete</button>
     </div>
   </div>
 </div>

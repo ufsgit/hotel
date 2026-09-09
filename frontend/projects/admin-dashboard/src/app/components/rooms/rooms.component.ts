@@ -16,6 +16,14 @@ export class RoomsComponent implements OnInit {
   showForm = false;
   isEditing = false;
   isUploading = false;
+  customAmenityInput = '';
+
+  availableAmenities: string[] = [
+    'WiFi', 'TV', 'Air Conditioning', 'Mini Bar', 'Balcony', 
+    'City View', 'Ocean View', 'Safe Box', 'Coffee Maker', 
+    'Room Service', 'Bathtub', 'Hair Dryer'
+  ];
+
   formData: any = {
     name: '',
     description: '',
@@ -25,7 +33,8 @@ export class RoomsComponent implements OnInit {
     total_rooms: 10,
     extra_bed_allowed: false,
     extra_bed_price: 0,
-    cover_image: ''
+    cover_image: '',
+    amenities: []
   };
 
   constructor(private api: AdminApiService) {}
@@ -39,6 +48,7 @@ export class RoomsComponent implements OnInit {
     this.api.getRoomTypes().subscribe({
       next: (data) => {
         this.rooms = data;
+        this.refreshAvailableAmenities();
         this.isLoading = false;
       },
       error: (err) => {
@@ -48,8 +58,34 @@ export class RoomsComponent implements OnInit {
     });
   }
 
+  parseAmenities(amenities: any): string[] {
+    if (!amenities) return [];
+    if (Array.isArray(amenities)) return amenities;
+    if (typeof amenities === 'string') {
+      try {
+        const parsed = JSON.parse(amenities);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  }
+
+  refreshAvailableAmenities(): void {
+    const set = new Set<string>(this.availableAmenities);
+    for (const r of this.rooms) {
+      const ams = this.parseAmenities(r.amenities);
+      for (const a of ams) {
+        if (a && typeof a === 'string') set.add(a.trim());
+      }
+    }
+    this.availableAmenities = Array.from(set);
+  }
+
   openNewForm(): void {
     this.isEditing = false;
+    this.customAmenityInput = '';
     this.formData = { 
       name: '', 
       description: '', 
@@ -59,13 +95,15 @@ export class RoomsComponent implements OnInit {
       total_rooms: 10,
       extra_bed_allowed: false,
       extra_bed_price: 0,
-      cover_image: '' 
+      cover_image: '',
+      amenities: ['WiFi', 'TV', 'Air Conditioning']
     };
     this.showForm = true;
   }
 
   openEditForm(room: any): void {
     this.isEditing = true;
+    this.customAmenityInput = '';
     let cover = '';
     if (room.photos) {
       if (Array.isArray(room.photos) && room.photos.length > 0) {
@@ -79,8 +117,55 @@ export class RoomsComponent implements OnInit {
         }
       }
     }
-    this.formData = { ...room, cover_image: cover };
+
+    const roomAmenities = this.parseAmenities(room.amenities);
+    for (const a of roomAmenities) {
+      if (!this.availableAmenities.includes(a)) {
+        this.availableAmenities.push(a);
+      }
+    }
+
+    this.formData = { 
+      ...room, 
+      cover_image: cover,
+      amenities: [...roomAmenities]
+    };
     this.showForm = true;
+  }
+
+  toggleAmenity(amenity: string): void {
+    if (!this.formData.amenities) this.formData.amenities = [];
+    const idx = this.formData.amenities.indexOf(amenity);
+    if (idx > -1) {
+      this.formData.amenities.splice(idx, 1);
+    } else {
+      this.formData.amenities.push(amenity);
+    }
+  }
+
+  isAmenitySelected(amenity: string): boolean {
+    return Array.isArray(this.formData.amenities) && this.formData.amenities.includes(amenity);
+  }
+
+  addCustomAmenity(): void {
+    const trimmed = this.customAmenityInput.trim();
+    if (!trimmed) return;
+    if (!this.formData.amenities) this.formData.amenities = [];
+    if (!this.formData.amenities.includes(trimmed)) {
+      this.formData.amenities.push(trimmed);
+    }
+    if (!this.availableAmenities.includes(trimmed)) {
+      this.availableAmenities.push(trimmed);
+    }
+    this.customAmenityInput = '';
+  }
+
+  removeAmenity(amenity: string): void {
+    if (!this.formData.amenities) return;
+    const idx = this.formData.amenities.indexOf(amenity);
+    if (idx > -1) {
+      this.formData.amenities.splice(idx, 1);
+    }
   }
 
   cancelForm(): void {
@@ -123,7 +208,8 @@ export class RoomsComponent implements OnInit {
   saveRoom(): void {
     const payload = {
       ...this.formData,
-      photos: this.formData.cover_image ? [this.formData.cover_image] : []
+      photos: this.formData.cover_image ? [this.formData.cover_image] : [],
+      amenities: this.formData.amenities || []
     };
 
     if (this.isEditing) {

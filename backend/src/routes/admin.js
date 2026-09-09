@@ -153,15 +153,19 @@ router.post('/upload-room-photo', uploadRoomPhoto.single('photo'), async (req, r
 // Room Types CRUD
 router.post('/room-types', async (req, res) => {
     try {
-        const { name, description, base_price, default_capacity, max_capacity, max_occupancy, extra_bed_allowed, extra_bed_price, total_rooms, photos } = req.body;
+        const { name, description, base_price, default_capacity, max_capacity, max_occupancy, extra_bed_allowed, extra_bed_price, total_rooms, photos, amenities } = req.body;
         const maxOcc = max_occupancy || max_capacity || default_capacity || 2;
         let photosJson = null;
         if (photos) {
             photosJson = JSON.stringify(Array.isArray(photos) ? photos : [photos]);
         }
+        let amenitiesJson = null;
+        if (amenities) {
+            amenitiesJson = JSON.stringify(Array.isArray(amenities) ? amenities : [amenities]);
+        }
         const [result] = await pool.query(
-            'INSERT INTO room_types (hotel_id, name, description, base_price, max_occupancy, extra_bed_allowed, extra_bed_price, total_rooms, photos) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [req.user.hotel_id, name || '', description || '', base_price || 0, maxOcc, extra_bed_allowed ? 1 : 0, extra_bed_price || 0, total_rooms || 10, photosJson]
+            'INSERT INTO room_types (hotel_id, name, description, base_price, max_occupancy, extra_bed_allowed, extra_bed_price, total_rooms, photos, amenities) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [req.user.hotel_id, name || '', description || '', base_price || 0, maxOcc, extra_bed_allowed ? 1 : 0, extra_bed_price || 0, total_rooms || 10, photosJson, amenitiesJson]
         );
         res.json({ id: result.insertId, message: 'Room type created' });
     } catch (err) {
@@ -171,15 +175,19 @@ router.post('/room-types', async (req, res) => {
 
 router.put('/room-types/:id', async (req, res) => {
     try {
-        const { name, description, base_price, default_capacity, max_capacity, max_occupancy, extra_bed_allowed, extra_bed_price, total_rooms, photos } = req.body;
+        const { name, description, base_price, default_capacity, max_capacity, max_occupancy, extra_bed_allowed, extra_bed_price, total_rooms, photos, amenities } = req.body;
         const maxOcc = max_occupancy || max_capacity || default_capacity || 2;
         let photosJson = null;
         if (photos) {
             photosJson = JSON.stringify(Array.isArray(photos) ? photos : [photos]);
         }
+        let amenitiesJson = null;
+        if (amenities !== undefined) {
+            amenitiesJson = JSON.stringify(Array.isArray(amenities) ? amenities : (amenities ? [amenities] : []));
+        }
         await pool.query(
-            'UPDATE room_types SET name = ?, description = ?, base_price = ?, max_occupancy = ?, extra_bed_allowed = ?, extra_bed_price = ?, total_rooms = COALESCE(?, total_rooms), photos = COALESCE(?, photos) WHERE id = ? AND hotel_id = ?',
-            [name, description || '', base_price || 0, maxOcc, extra_bed_allowed ? 1 : 0, extra_bed_price || 0, total_rooms, photosJson, req.params.id, req.user.hotel_id]
+            'UPDATE room_types SET name = ?, description = ?, base_price = ?, max_occupancy = ?, extra_bed_allowed = ?, extra_bed_price = ?, total_rooms = COALESCE(?, total_rooms), photos = COALESCE(?, photos), amenities = COALESCE(?, amenities) WHERE id = ? AND hotel_id = ?',
+            [name, description || '', base_price || 0, maxOcc, extra_bed_allowed ? 1 : 0, extra_bed_price || 0, total_rooms, photosJson, amenitiesJson, req.params.id, req.user.hotel_id]
         );
         res.json({ message: 'Room type updated' });
     } catch (err) {
