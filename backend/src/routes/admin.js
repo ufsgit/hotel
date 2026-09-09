@@ -204,13 +204,17 @@ router.get('/reports/stats', async (req, res) => {
         
         // Collected Revenue: only paid or partial bookings
         const [revRow] = await pool.query(
-            `SELECT SUM(total_amount) as revenue FROM bookings WHERE hotel_id = ? AND booking_status != 'cancelled' AND payment_status IN ('paid', 'partial')`,
+            `SELECT COALESCE(SUM(CASE 
+                WHEN payment_status = 'paid' THEN total_amount 
+                WHEN payment_status = 'partial' THEN total_amount / 2 
+                ELSE 0 
+            END), 0) as revenue FROM bookings WHERE hotel_id = ? AND booking_status != 'cancelled'`,
             [hotelId]
         );
 
         // Expected Revenue: all non-cancelled bookings (including pay-at-hotel)
         const [expectedRevRow] = await pool.query(
-            `SELECT SUM(total_amount) as expected_revenue FROM bookings WHERE hotel_id = ? AND booking_status != 'cancelled'`,
+            `SELECT COALESCE(SUM(total_amount), 0) as expected_revenue FROM bookings WHERE hotel_id = ? AND booking_status != 'cancelled'`,
             [hotelId]
         );
         
@@ -224,8 +228,8 @@ router.get('/reports/stats', async (req, res) => {
         const [depRow] = await pool.query(`SELECT COUNT(*) as departures FROM bookings WHERE hotel_id = ? AND check_out_date = CURDATE()`, [hotelId]);
 
         res.json({
-            revenue: revRow[0].revenue || 0,
-            expectedRevenue: expectedRevRow[0].expected_revenue || 0,
+            revenue: parseFloat(revRow[0].revenue) || 0,
+            expectedRevenue: parseFloat(expectedRevRow[0].expected_revenue) || 0,
             totalBookings: bkRow[0].total_bookings || 0,
             arrivalsToday: arrRow[0].arrivals || 0,
             departuresToday: depRow[0].departures || 0

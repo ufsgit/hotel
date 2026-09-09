@@ -21,9 +21,9 @@
       </div>
       <div>
         <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Collected Revenue</div>
-        <div class="text-3xl font-extrabold text-indigo-950" [appCountUp]="stats.revenue" prefix="$"></div>
+        <div class="text-3xl font-extrabold text-indigo-950" [appCountUp]="stats.revenue" prefix="$" [decimals]="2"></div>
         <div class="text-xs text-gray-400 mt-1">
-          Expected: <span class="font-semibold text-gray-500">${{ stats.expectedRevenue | number:'1.2-2' }}</span>
+          Expected: <span class="font-semibold text-gray-500">${{ (stats.expectedRevenue || 0) | number:'1.2-2' }}</span>
         </div>
       </div>
     </div>
