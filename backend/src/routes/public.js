@@ -40,14 +40,24 @@ router.get('/hotels/:slug/availability', async (req, res) => {
         const [hotels] = await pool.query('SELECT id FROM hotels WHERE slug = ?', [req.params.slug]);
         if (hotels.length === 0) return res.status(404).json({ error: 'Hotel not found' });
 
-        // MVP Simplified: Just return room types. Real logic would join room_inventory.
         const [roomTypes] = await pool.query(
             'SELECT * FROM room_types WHERE hotel_id = ? AND max_occupancy >= ?',
             [hotels[0].id, parseInt(guests)]
         );
-        
-        // Mock a min_available property for frontend
-        roomTypes.forEach(rt => rt.min_available = Math.floor(Math.random() * 5) + 1);
+
+        // For each room type, calculate real availability:
+        // available = total_rooms - active bookings that overlap the requested dates
+        for (const rt of roomTypes) {
+            const [bookings] = await pool.query(
+                `SELECT COUNT(*) as booked FROM bookings
+                 WHERE room_type_id = ? 
+                 AND booking_status NOT IN ('cancelled', 'checked_out')
+                 AND check_in_date < ? AND check_out_date > ?`,
+                [rt.id, checkOut, checkIn]
+            );
+            const booked = bookings[0].booked || 0;
+            rt.min_available = Math.max(0, (rt.total_rooms || 1) - booked);
+        }
 
         res.json(roomTypes);
     } catch (err) {

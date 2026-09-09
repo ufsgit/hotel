@@ -22,7 +22,9 @@ export class RoomsComponent implements OnInit {
     base_price: 0,
     default_capacity: 2,
     max_capacity: 4,
+    total_rooms: 10,
     extra_bed_allowed: false,
+    extra_bed_price: 0,
     cover_image: ''
   };
 
@@ -54,7 +56,9 @@ export class RoomsComponent implements OnInit {
       base_price: 0, 
       default_capacity: 2, 
       max_capacity: 4, 
+      total_rooms: 10,
       extra_bed_allowed: false,
+      extra_bed_price: 0,
       cover_image: '' 
     };
     this.showForm = true;
