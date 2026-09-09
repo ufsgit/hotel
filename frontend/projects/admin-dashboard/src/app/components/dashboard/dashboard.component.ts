@@ -55,6 +55,10 @@ export class DashboardComponent implements OnInit {
   public lineChartData!: ChartConfiguration<'line'>['data'];
   public barChartData!:  ChartConfiguration<'bar'>['data'];
 
+  // ── Live backend data cache ────────────────────────────────────────────────
+  liveRevenueTrend: { labels: string[], values: number[] } = { labels: [], values: [] };
+  liveOccupancy: { labels: string[], values: number[] } = { labels: [], values: [] };
+
   public lineChartOptions: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
@@ -63,9 +67,23 @@ export class DashboardComponent implements OnInit {
       y: { easing: 'easeOutElastic', duration: 2500,
            from: (ctx: any) => ctx.chart?.scales?.y?.getPixelForValue(0) || 0 }
     },
-    plugins: { legend: { display: false } },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (context) => ` Revenue: $${Number(context.parsed.y).toLocaleString()}`
+        }
+      }
+    },
     scales: {
-      y: { border: { display: false }, grid: { color: 'rgba(0,0,0,0.05)' } },
+      y: {
+        beginAtZero: true,
+        border: { display: false },
+        grid: { color: 'rgba(0,0,0,0.05)' },
+        ticks: {
+          callback: (val) => `$${val}`
+        }
+      },
       x: { border: { display: false }, grid: { display: false } }
     }
   };
@@ -78,9 +96,25 @@ export class DashboardComponent implements OnInit {
       easing: 'easeOutElastic',
       delay: (context) => context.dataIndex * 150
     },
-    plugins: { legend: { display: false } },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (context) => ` Occupancy: ${context.parsed.y}%`
+        }
+      }
+    },
     scales: {
-      y: { border: { display: false }, grid: { color: 'rgba(0,0,0,0.05)' } },
+      y: {
+        beginAtZero: true,
+        max: 100,
+        border: { display: false },
+        grid: { color: 'rgba(0,0,0,0.05)' },
+        ticks: {
+          stepSize: 20,
+          callback: (val) => `${val}%`
+        }
+      },
       x: { border: { display: false }, grid: { display: false } }
     }
   };
@@ -88,36 +122,67 @@ export class DashboardComponent implements OnInit {
   constructor(private api: AdminApiService) {}
 
   ngOnInit(): void {
-    this.loadChartData();
+    // Clear any previous mock data saved in localStorage so live data takes precedence
+    this.cleanLegacyMockStorage();
+
     this.api.getStats().subscribe({
-      next: (data) => { this.stats = data; this.isLoading = false; },
-      error: (err) => { console.error('Failed to load stats', err); this.isLoading = false; }
+      next: (data) => {
+        this.stats = data;
+
+        if (data.revenueTrend && data.revenueTrend.labels?.length) {
+          this.liveRevenueTrend = data.revenueTrend;
+          const savedLine = localStorage.getItem(STORAGE_KEY_LINE);
+          if (savedLine) {
+            const parsed = JSON.parse(savedLine);
+            this.lineLabels = parsed.labels;
+            this.lineValues = parsed.values;
+          } else {
+            this.lineLabels = [...data.revenueTrend.labels];
+            this.lineValues = [...data.revenueTrend.values];
+          }
+          this.rebuildLineChart();
+        }
+
+        if (data.occupancyByRoomType && data.occupancyByRoomType.labels?.length) {
+          this.liveOccupancy = data.occupancyByRoomType;
+          const savedBar = localStorage.getItem(STORAGE_KEY_BAR);
+          if (savedBar) {
+            const parsed = JSON.parse(savedBar);
+            this.barLabels = parsed.labels;
+            this.barValues = parsed.values;
+          } else {
+            this.barLabels = [...data.occupancyByRoomType.labels];
+            this.barValues = [...data.occupancyByRoomType.values];
+          }
+          this.rebuildBarChart();
+        }
+
+        this.isLoading = false;
+      },
+      error: (err) => {
+        console.error('Failed to load stats', err);
+        this.loadChartFallback();
+        this.isLoading = false;
+      }
     });
   }
 
-  // ── Persistence helpers ─────────────────────────────────────────────────────
-  private loadChartData(): void {
+  private cleanLegacyMockStorage(): void {
     const savedLine = localStorage.getItem(STORAGE_KEY_LINE);
-    const savedBar  = localStorage.getItem(STORAGE_KEY_BAR);
-
-    if (savedLine) {
-      const d = JSON.parse(savedLine);
-      this.lineLabels = d.labels;
-      this.lineValues = d.values;
-    } else {
-      this.lineLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      this.lineValues = [1200, 1900, 1500, 2200, 1800, 2500, 2800];
+    if (savedLine && savedLine.includes('1200')) {
+      localStorage.removeItem(STORAGE_KEY_LINE);
     }
-
-    if (savedBar) {
-      const d = JSON.parse(savedBar);
-      this.barLabels = d.labels;
-      this.barValues = d.values;
-    } else {
-      this.barLabels = ['Standard', 'Deluxe', 'Suite', 'Penthouse'];
-      this.barValues = [65, 45, 20, 5];
+    const savedBar = localStorage.getItem(STORAGE_KEY_BAR);
+    if (savedBar && savedBar.includes('Penthouse')) {
+      localStorage.removeItem(STORAGE_KEY_BAR);
     }
+  }
 
+  private loadChartFallback(): void {
+    this.lineLabels = ['Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed'];
+    this.lineValues = [0, 0, 0, 0, 0, 0, 0];
+    this.barLabels = ['Standard Room', 'Deluxe Suite'];
+    this.barValues = [0, 0];
     this.rebuildLineChart();
     this.rebuildBarChart();
   }
@@ -198,16 +263,26 @@ export class DashboardComponent implements OnInit {
 
   resetLineChart(): void {
     localStorage.removeItem(STORAGE_KEY_LINE);
-    this.lineLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    this.lineValues = [1200, 1900, 1500, 2200, 1800, 2500, 2800];
+    if (this.liveRevenueTrend.labels.length) {
+      this.lineLabels = [...this.liveRevenueTrend.labels];
+      this.lineValues = [...this.liveRevenueTrend.values];
+    } else {
+      this.lineLabels = ['Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed'];
+      this.lineValues = [0, 0, 0, 0, 0, 0, 0];
+    }
     this.rebuildLineChart();
     this.showLineEditor = false;
   }
 
   resetBarChart(): void {
     localStorage.removeItem(STORAGE_KEY_BAR);
-    this.barLabels = ['Standard', 'Deluxe', 'Suite', 'Penthouse'];
-    this.barValues = [65, 45, 20, 5];
+    if (this.liveOccupancy.labels.length) {
+      this.barLabels = [...this.liveOccupancy.labels];
+      this.barValues = [...this.liveOccupancy.values];
+    } else {
+      this.barLabels = ['Standard Room', 'Deluxe Suite'];
+      this.barValues = [0, 0];
+    }
     this.rebuildBarChart();
     this.showBarEditor = false;
   }

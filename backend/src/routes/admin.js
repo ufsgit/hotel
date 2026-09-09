@@ -227,12 +227,62 @@ router.get('/reports/stats', async (req, res) => {
         // Departures today
         const [depRow] = await pool.query(`SELECT COUNT(*) as departures FROM bookings WHERE hotel_id = ? AND check_out_date = CURDATE()`, [hotelId]);
 
+        // 7-Day Revenue Trend
+        const [revTrendRows] = await pool.query(`
+            SELECT 
+                DATE_FORMAT(d.dt, '%a') as day_name,
+                COALESCE(SUM(b.total_amount), 0) as daily_revenue
+            FROM (
+                SELECT CURDATE() - INTERVAL 6 DAY as dt UNION ALL
+                SELECT CURDATE() - INTERVAL 5 DAY UNION ALL
+                SELECT CURDATE() - INTERVAL 4 DAY UNION ALL
+                SELECT CURDATE() - INTERVAL 3 DAY UNION ALL
+                SELECT CURDATE() - INTERVAL 2 DAY UNION ALL
+                SELECT CURDATE() - INTERVAL 1 DAY UNION ALL
+                SELECT CURDATE()
+            ) d
+            LEFT JOIN bookings b ON b.hotel_id = ? 
+                AND b.booking_status != 'cancelled'
+                AND b.check_in_date = d.dt
+            GROUP BY d.dt
+            ORDER BY d.dt ASC
+        `, [hotelId]);
+
+        // Occupancy by room type (real-time for active stays today)
+        const [occRows] = await pool.query(`
+            SELECT 
+                r.id,
+                r.name,
+                r.total_rooms,
+                COUNT(b.id) as active_bookings
+            FROM room_types r
+            LEFT JOIN bookings b ON b.room_type_id = r.id 
+                AND b.hotel_id = r.hotel_id 
+                AND b.booking_status NOT IN ('cancelled')
+                AND b.check_in_date <= CURDATE() 
+                AND b.check_out_date > CURDATE()
+            WHERE r.hotel_id = ?
+            GROUP BY r.id, r.name, r.total_rooms
+        `, [hotelId]);
+
+        const revenueTrend = {
+            labels: revTrendRows.map(r => r.day_name),
+            values: revTrendRows.map(r => parseFloat(r.daily_revenue) || 0)
+        };
+
+        const occupancyByRoomType = {
+            labels: occRows.map(r => r.name),
+            values: occRows.map(r => r.total_rooms > 0 ? Math.round((r.active_bookings / r.total_rooms) * 100) : 0)
+        };
+
         res.json({
             revenue: parseFloat(revRow[0].revenue) || 0,
             expectedRevenue: parseFloat(expectedRevRow[0].expected_revenue) || 0,
             totalBookings: bkRow[0].total_bookings || 0,
             arrivalsToday: arrRow[0].arrivals || 0,
-            departuresToday: depRow[0].departures || 0
+            departuresToday: depRow[0].departures || 0,
+            revenueTrend,
+            occupancyByRoomType
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
