@@ -11,7 +11,7 @@ import { ApiService } from '../../services/api.service';
   templateUrl: './booking.component.html'
 })
 export class BookingComponent implements OnInit {
-  hotelSlug = 'grand-oasis';
+  hotelSlug = '';
   bookingData: any = {
     roomTypeId: null,
     roomName: '',
@@ -42,6 +42,7 @@ export class BookingComponent implements OnInit {
       this.bookingData.checkIn = params['checkIn'];
       this.bookingData.checkOut = params['checkOut'];
       this.bookingData.guests = params['guests'];
+      this.hotelSlug = params['hotel'] || '';
       
       if (!this.bookingData.roomTypeId) {
         this.router.navigate(['/']);
@@ -102,7 +103,8 @@ export class BookingComponent implements OnInit {
         if (this.bookingData.paymentOption === 'pay_later') {
           this.isSubmitting = false;
           this.router.navigate(['/confirmation'], {
-            queryParams: { ref: res.reference, name: this.bookingData.guest_name }
+            queryParams: { ref: res.reference, name: this.bookingData.guest_name },
+            queryParamsHandling: 'merge'
           });
         } else {
           this.initiatePayment(res.booking_id, res.reference);
@@ -125,7 +127,8 @@ export class BookingComponent implements OnInit {
       is_partial: isPartial
     }).subscribe({
       next: (orderRes) => {
-        this.openRazorpay(orderRes.order, bookingId, reference, isPartial);
+        // Use the key_id returned by the backend (hotel-specific)
+        this.openRazorpay(orderRes.order, bookingId, reference, isPartial, orderRes.key_id);
       },
       error: (err) => {
         console.error('Failed to create order', err);
@@ -135,12 +138,12 @@ export class BookingComponent implements OnInit {
     });
   }
 
-  openRazorpay(order: any, bookingId: number, reference: string, isPartial: boolean): void {
+  openRazorpay(order: any, bookingId: number, reference: string, isPartial: boolean, keyId: string = 'rzp_test_dummykey1234'): void {
     const options = {
-      key: 'rzp_test_dummykey1234', // Should normally fetch from backend
+      key: keyId, // Dynamic: uses this hotel's own Razorpay Key ID
       amount: order.amount,
       currency: order.currency,
-      name: 'Grand Oasis Hotel',
+      name: 'Hotel Booking',
       description: `Booking ${reference}`,
       order_id: order.id,
       handler: (response: any) => {
@@ -154,7 +157,8 @@ export class BookingComponent implements OnInit {
         }).subscribe(() => {
           this.isSubmitting = false;
           this.router.navigate(['/confirmation'], {
-            queryParams: { ref: reference, name: this.bookingData.guest_name, paid: true }
+            queryParams: { ref: reference, name: this.bookingData.guest_name, paid: true },
+            queryParamsHandling: 'merge'
           });
         });
       },

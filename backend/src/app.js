@@ -24,9 +24,11 @@ app.get('/health', (req, res) => {
 // Import routes
 const publicRoutes = require('./routes/public');
 const adminRoutes = require('./routes/admin');
+const superAdminRoutes = require('./routes/superadmin');
 
 app.use('/api', publicRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/superadmin', superAdminRoutes);
 
 const PORT = process.env.PORT || 3000;
 

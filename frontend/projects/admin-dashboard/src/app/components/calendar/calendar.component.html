@@ -55,7 +55,7 @@
         <tr *ngFor="let room of roomTypes" class="hover:bg-gray-50/50 transition">
           <td class="p-4 text-sm font-semibold text-gray-900 sticky left-0 bg-white z-10 shadow-[1px_0_0_0_#e5e7eb] flex flex-col justify-center">
             <span>{{ room.name }}</span>
-            <span class="text-[11px] font-normal text-gray-400">${{ room.base_price || 0 }}/night</span>
+            <span class="text-[11px] font-normal text-gray-400">₹{{ room.base_price || 0 }}/night</span>
           </td>
 
           <td *ngFor="let day of monthDays" 
@@ -128,7 +128,7 @@
       </div>
       <div class="flex justify-between pt-2 border-t border-gray-200 font-bold text-gray-900">
         <span>Total Amount</span>
-        <span>${{ selectedBooking.total_amount }}</span>
+        <span>₹{{ selectedBooking.total_amount }}</span>
       </div>
     </div>
 

@@ -50,7 +50,13 @@
       <div class="mt-auto pt-4 border-t border-gray-200/50 flex justify-between items-end">
         <div>
           <p class="text-[10px] text-gray-500 uppercase tracking-widest font-semibold mb-1">Price per night</p>
-          <p class="text-3xl font-extrabold text-gray-900 flex items-start leading-none"><span class="text-lg mt-1 mr-1 text-[var(--primary-color,theme(colors.blue.600))]">$</span>{{ room.base_price }}</p>
+          <p class="text-3xl font-extrabold text-gray-900 flex items-start leading-none"><span class="text-lg mt-1 mr-1 text-[var(--primary-color,theme(colors.blue.600))]">₹</span>{{ pricePerNightFor(room) | number:'1.2-2' }}</p>
+          <!-- Extra bed notice -->
+          <div *ngIf="extraBedsFor(room) > 0" class="mt-1.5 flex items-center gap-1 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+            <i class="material-icons text-[13px] text-amber-500">hotel</i>
+            <span>Incl. {{ extraBedsFor(room) }} extra bed (₹{{ room.extra_bed_price }}/night)</span>
+          </div>
+          <p *ngIf="extraBedsFor(room) === 0" class="text-[11px] text-gray-400 mt-1">Base: ₹{{ room.base_price }}</p>
         </div>
         <button (click)="bookRoom(room)" class="bg-gradient-to-r from-[var(--primary-color,theme(colors.slate.800))] to-slate-900 hover:from-slate-700 hover:to-slate-800 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg hover:shadow-slate-500/30 hover:-translate-y-0.5 active:translate-y-0">
           Reserve

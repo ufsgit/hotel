@@ -1,9 +1,13 @@
 const pool = require('../config/db');
 
 async function calculatePrice(hotel_id, room_type_id, check_in, check_out, guests, promo_code_str = null) {
-    const [roomTypes] = await pool.query('SELECT base_price, extra_bed_price, max_occupancy FROM room_types WHERE id = ?', [room_type_id]);
+    const [roomTypes] = await pool.query('SELECT base_price, extra_bed_price, max_occupancy, default_capacity FROM room_types WHERE id = ?', [room_type_id]);
     if (roomTypes.length === 0) throw new Error('Room type not found');
     const room = roomTypes[0];
+
+    // Fetch hotel tax rate
+    const [hotels] = await pool.query('SELECT tax_rate FROM hotels WHERE id = ?', [hotel_id]);
+    const taxRate = (hotels.length > 0 && hotels[0].tax_rate != null) ? parseFloat(hotels[0].tax_rate) / 100 : 0.10;
 
     const start = new Date(check_in);
     const end = new Date(check_out);
@@ -11,18 +15,21 @@ async function calculatePrice(hotel_id, room_type_id, check_in, check_out, guest
     
     if (nights <= 0) throw new Error('Invalid dates');
 
-    let baseTotal = room.base_price * nights;
+    let baseTotal = parseFloat(room.base_price) * nights;
     
-    // Extra beds
+    // Extra beds: guests beyond the default (base) capacity require extra beds
     let extraBeds = 0;
-    const capacity = room.max_occupancy || 2;
-    if (guests > capacity) {
-        extraBeds = guests - capacity;
-        baseTotal += (extraBeds * (room.extra_bed_price || 0) * nights);
+    let extraBedCharge = 0;
+    const defaultCap = room.default_capacity || room.max_occupancy || 2;
+    if (guests > defaultCap) {
+        extraBeds = guests - defaultCap;
+        extraBedCharge = extraBeds * parseFloat(room.extra_bed_price || 0) * nights;
+        baseTotal += extraBedCharge;
     }
 
     let subtotal = baseTotal;
     let seasonOfferId = null;
+    let seasonDiscount = 0;
 
     // Check for active seasonal offers
     const [offers] = await pool.query(
@@ -37,10 +44,11 @@ async function calculatePrice(hotel_id, room_type_id, check_in, check_out, guest
         const offer = offers[0];
         seasonOfferId = offer.id;
         if (offer.discount_type === 'percent') {
-            subtotal -= subtotal * (offer.discount_value / 100);
+            seasonDiscount = subtotal * (offer.discount_value / 100);
         } else {
-            subtotal -= offer.discount_value;
+            seasonDiscount = offer.discount_value;
         }
+        subtotal -= seasonDiscount;
     }
 
     let promoCodeId = null;
@@ -72,16 +80,21 @@ async function calculatePrice(hotel_id, room_type_id, check_in, check_out, guest
     // Ensure subtotal doesn't go below 0
     if (subtotal < 0) subtotal = 0;
 
-    const taxAmount = subtotal * 0.10; // 10% flat tax for MVP
+    const taxAmount = subtotal * taxRate;
     const totalAmount = subtotal + taxAmount;
+    const taxRatePercent = taxRate * 100;
 
     return {
         nights,
         baseTotal,
+        extraBeds,
+        extraBedCharge,
+        seasonDiscount,
+        promoDiscount,
         subtotal,
+        taxRate: taxRatePercent,
         taxAmount,
         totalAmount,
-        extraBeds,
         seasonOfferId,
         promoCodeId
     };

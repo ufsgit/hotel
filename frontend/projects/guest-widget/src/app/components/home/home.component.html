@@ -11,17 +11,17 @@
         Get {{ activeOffers[0].discount_value }}% Off!
       </ng-container>
       <ng-container *ngIf="activeOffers[0].discount_type === 'flat'">
-        Save ${{ activeOffers[0].discount_value }}!
+        Save ₹{{ activeOffers[0].discount_value }}!
       </ng-container>
     </p>
   </div>
 </div>
 
 <!-- Standard Hero if no offers -->
-<div *ngIf="activeOffers.length === 0" class="mb-8 rounded-xl overflow-hidden shadow-lg relative h-64 md:h-80 bg-blue-500">
-  <img src="https://via.placeholder.com/1200x400/008cff/ffffff?text=Welcome+to+Grand+Oasis" alt="Welcome" class="absolute inset-0 w-full h-full object-cover opacity-30 mix-blend-overlay">
+<div *ngIf="activeOffers.length === 0" class="mb-8 rounded-xl overflow-hidden shadow-lg relative h-64 md:h-80 bg-[var(--hotel-primary,theme(colors.blue.500))]">
+  <img src="https://via.placeholder.com/1200x400/000000/ffffff?text=Welcome+to+{{ hotelName }}" alt="Welcome" class="absolute inset-0 w-full h-full object-cover opacity-30 mix-blend-overlay">
   <div class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 text-white">
-    <h2 class="text-3xl md:text-5xl font-bold mb-2">Welcome to Grand Oasis</h2>
+    <h2 class="text-3xl md:text-5xl font-bold mb-2">Welcome to {{ hotelName }}</h2>
     <p class="text-lg md:text-xl">Your perfect getaway starts here.</p>
   </div>
 </div>

@@ -4,8 +4,7 @@
     <p class="text-gray-600 mt-1">Manage guest bookings and statuses.</p>
   </div>
   <div class="flex gap-2">
-    <input type="text" placeholder="Search by name or ref..." class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-    <button class="bg-gray-100 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition text-sm font-medium">Filter</button>
+    <input type="text" [(ngModel)]="searchTerm" placeholder="Search by name or ref..." class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm w-64">
   </div>
 </div>
 
@@ -24,10 +23,10 @@
       </thead>
       <tbody class="bg-white divide-y divide-gray-200">
         <tr *ngIf="isLoading"><td colspan="6" class="text-center py-8 text-gray-500">Loading reservations...</td></tr>
-        <tr *ngIf="!isLoading && bookings.length === 0"><td colspan="6" class="text-center py-8 text-gray-500">No reservations found.</td></tr>
+        <tr *ngIf="!isLoading && filteredBookings.length === 0"><td colspan="6" class="text-center py-8 text-gray-500">No reservations found.</td></tr>
         
-        <tr *ngFor="let booking of bookings" class="hover:bg-gray-50 transition-colors">
-          <td class="px-6 py-4 whitespace-nowrap">
+        <tr *ngFor="let booking of filteredBookings" class="hover:bg-gray-50 transition-colors">
+          <td class="px-6 py-4 whitespace-nowrap cursor-pointer hover:bg-gray-100 transition-colors" (click)="openGuestModal(booking)" title="View Guest Details">
             <div class="flex items-center">
               <div class="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
                 {{ booking.guest_name ? booking.guest_name.charAt(0) : 'G' }}
@@ -42,7 +41,7 @@
             <div class="text-sm text-gray-900">{{ booking.check_in_date | date:'MMM d' }} &rarr; {{ booking.check_out_date | date:'MMM d' }}</div>
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-            ${{ booking.total_amount }}
+            ₹{{ booking.total_amount }}
           </td>
           <td class="px-6 py-4 whitespace-nowrap">
             <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
@@ -91,7 +90,7 @@
               <!-- Received Amount — only shown for partial -->
               <div *ngIf="booking.payment_status === 'partial'" class="flex items-end gap-1">
                 <div>
-                  <label class="block text-[10px] text-gray-400 font-bold uppercase mb-0.5">Received ($)</label>
+                  <label class="block text-[10px] text-gray-400 font-bold uppercase mb-0.5">Received (₹)</label>
                   <input type="number" min="0" [max]="booking.total_amount"
                     [(ngModel)]="partialAmounts[booking.id]"
                     placeholder="0.00"
@@ -107,5 +106,64 @@
         </tr>
       </tbody>
     </table>
+  </div>
+</div>
+
+<!-- ── Guest Details Modal ──────────────────────────────────────────────── -->
+<div *ngIf="isGuestModalOpen && selectedGuestBooking" class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" (click)="closeGuestModal()">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" (click)="$event.stopPropagation()">
+    
+    <div class="flex justify-between items-start mb-6 border-b border-gray-100 pb-4">
+      <h2 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+        <i class="material-icons text-blue-500">account_circle</i> Guest Details
+      </h2>
+      <button (click)="closeGuestModal()" class="text-gray-400 hover:text-gray-600">
+        <i class="material-icons">close</i>
+      </button>
+    </div>
+
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Full Name</label>
+        <div class="text-sm font-medium text-gray-900">{{ selectedGuestBooking.guest_name }}</div>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Email Address</label>
+        <div class="text-sm font-medium text-gray-900">{{ selectedGuestBooking.guest_email || 'Not provided' }}</div>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Phone Number</label>
+        <div class="text-sm font-medium text-gray-900">{{ selectedGuestBooking.guest_phone || 'Not provided' }}</div>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Selected Room</label>
+        <div class="text-sm font-medium text-gray-900">{{ selectedGuestBooking.room_type_name || 'N/A' }}</div>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Number of Guests</label>
+        <div class="text-sm font-medium text-gray-900">{{ selectedGuestBooking.num_guests }}</div>
+      </div>
+
+      <div class="pt-4 border-t border-gray-100 mt-4">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Guest Identity Document</label>
+        
+        <div *ngIf="selectedGuestBooking.guest_document_url" class="mb-4 flex items-center justify-between p-3 bg-blue-50 border border-blue-100 rounded-lg">
+          <div class="flex items-center gap-2">
+            <i class="material-icons text-blue-500">description</i>
+            <span class="text-sm font-medium text-blue-800">Document Uploaded</span>
+          </div>
+          <a [href]="selectedGuestBooking.guest_document_url" target="_blank" class="text-xs font-bold text-blue-600 hover:text-blue-800 underline">View File</a>
+        </div>
+
+        <div class="relative">
+          <input type="file" (change)="onDocumentSelected($event)" accept="image/*,application/pdf"
+            class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer border border-gray-200 rounded-lg">
+        </div>
+        
+        <p *ngIf="isUploadingDoc" class="text-xs text-blue-600 mt-2 font-medium animate-pulse">Uploading document...</p>
+        <p *ngIf="uploadDocError" class="text-xs text-red-500 mt-2 font-medium"><i class="material-icons text-[14px] align-text-bottom">error</i> {{ uploadDocError }}</p>
+      </div>
+    </div>
+
   </div>
 </div>

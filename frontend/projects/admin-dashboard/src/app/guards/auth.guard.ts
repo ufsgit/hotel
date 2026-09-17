@@ -7,6 +7,24 @@ export const authGuard: CanActivateFn = (route, state) => {
   const router = inject(Router);
 
   if (authService.isLoggedIn()) {
+    let payload: any = null;
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) payload = JSON.parse(userStr);
+    } catch(e) {}
+    
+    // Redirect super admin from hotel admin pages
+    if (payload?.role === 'super_admin' && !state.url.startsWith('/manage-hotels')) {
+      router.navigate(['/manage-hotels']);
+      return false;
+    }
+
+    // Redirect hotel admin from super admin pages
+    if (payload?.role !== 'super_admin' && state.url.startsWith('/manage-hotels')) {
+      router.navigate(['/dashboard']);
+      return false;
+    }
+
     return true;
   }
 

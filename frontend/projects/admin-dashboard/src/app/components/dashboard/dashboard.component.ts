@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AdminApiService } from '../../services/admin-api.service';
@@ -37,9 +37,11 @@ const STORAGE_KEY_BAR  = 'dashboard_bar_chart';
     ])
   ]
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
   stats: any = { revenue: 0, expectedRevenue: 0, totalBookings: 0, arrivalsToday: 0, departuresToday: 0 };
   isLoading = true;
+  private statsInterval: any;
+  selectedRange: 'today' | '7d' | '30d' | 'all' = '7d';
 
   // ── Edit panel toggles ──────────────────────────────────────────────────────
   showLineEditor = false;
@@ -59,6 +61,12 @@ export class DashboardComponent implements OnInit {
   liveRevenueTrend: { labels: string[], values: number[] } = { labels: [], values: [] };
   liveOccupancy: { labels: string[], values: number[] } = { labels: [], values: [] };
 
+  // ── Stat Details Modal ──────────────────────────────────────────────────────
+  isStatModalOpen = false;
+  statModalTitle = '';
+  statModalBookings: any[] = [];
+  isStatLoading = false;
+
   public lineChartOptions: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
@@ -71,7 +79,7 @@ export class DashboardComponent implements OnInit {
       legend: { display: false },
       tooltip: {
         callbacks: {
-          label: (context) => ` Revenue: $${Number(context.parsed.y).toLocaleString()}`
+          label: (context) => ` Revenue: ₹${Number(context.parsed.y).toLocaleString()}`
         }
       }
     },
@@ -81,7 +89,7 @@ export class DashboardComponent implements OnInit {
         border: { display: false },
         grid: { color: 'rgba(0,0,0,0.05)' },
         ticks: {
-          callback: (val) => `$${val}`
+          callback: (val) => `₹${val}`
         }
       },
       x: { border: { display: false }, grid: { display: false } }
@@ -122,16 +130,24 @@ export class DashboardComponent implements OnInit {
   constructor(private api: AdminApiService) {}
 
   ngOnInit(): void {
+    this.loadStats();
+    // Poll stats every 10 seconds to keep numbers live
+    this.statsInterval = setInterval(() => this.refreshStats(), 10000);
+  }
+
+  loadStats(): void {
+    this.isLoading = true;
+    
     // Clear any previous mock data saved in localStorage so live data takes precedence
     this.cleanLegacyMockStorage();
 
-    this.api.getStats().subscribe({
+    this.api.getStats(this.selectedRange).subscribe({
       next: (data) => {
         this.stats = data;
 
         if (data.revenueTrend && data.revenueTrend.labels?.length) {
           this.liveRevenueTrend = data.revenueTrend;
-          const savedLine = localStorage.getItem(STORAGE_KEY_LINE);
+          const savedLine = localStorage.getItem(STORAGE_KEY_LINE + '_' + this.selectedRange);
           if (savedLine) {
             const parsed = JSON.parse(savedLine);
             this.lineLabels = parsed.labels;
@@ -140,6 +156,10 @@ export class DashboardComponent implements OnInit {
             this.lineLabels = [...data.revenueTrend.labels];
             this.lineValues = [...data.revenueTrend.values];
           }
+          this.rebuildLineChart();
+        } else {
+          this.lineLabels = ['No Data'];
+          this.lineValues = [0];
           this.rebuildLineChart();
         }
 
@@ -164,6 +184,31 @@ export class DashboardComponent implements OnInit {
         this.loadChartFallback();
         this.isLoading = false;
       }
+    });
+  }
+
+  onRangeChange(): void {
+    this.loadStats();
+  }
+
+  ngOnDestroy(): void {
+    if (this.statsInterval) clearInterval(this.statsInterval);
+  }
+
+  /** Lightweight refresh — only updates stat numbers, leaves charts untouched */
+  refreshStats(): void {
+    this.api.getStats(this.selectedRange).subscribe({
+      next: (data) => {
+        this.stats = {
+          ...this.stats,
+          revenue: data.revenue,
+          expectedRevenue: data.expectedRevenue,
+          totalBookings: data.totalBookings,
+          arrivalsToday: data.arrivalsToday,
+          departuresToday: data.departuresToday
+        };
+      },
+      error: () => {} // silently ignore polling errors
     });
   }
 
@@ -192,7 +237,7 @@ export class DashboardComponent implements OnInit {
       labels: [...this.lineLabels],
       datasets: [{
         data: [...this.lineValues],
-        label: 'Revenue ($)',
+        label: 'Revenue (₹)',
         fill: true,
         tension: 0.4,
         borderColor: '#008cff',
@@ -250,7 +295,7 @@ export class DashboardComponent implements OnInit {
   }
 
   applyLineChart(): void {
-    localStorage.setItem(STORAGE_KEY_LINE, JSON.stringify({ labels: this.lineLabels, values: this.lineValues }));
+    localStorage.setItem(STORAGE_KEY_LINE + '_' + this.selectedRange, JSON.stringify({ labels: this.lineLabels, values: this.lineValues }));
     this.rebuildLineChart();
     this.showLineEditor = false;
   }
@@ -262,7 +307,7 @@ export class DashboardComponent implements OnInit {
   }
 
   resetLineChart(): void {
-    localStorage.removeItem(STORAGE_KEY_LINE);
+    localStorage.removeItem(STORAGE_KEY_LINE + '_' + this.selectedRange);
     if (this.liveRevenueTrend.labels.length) {
       this.lineLabels = [...this.liveRevenueTrend.labels];
       this.lineValues = [...this.liveRevenueTrend.values];
@@ -285,6 +330,35 @@ export class DashboardComponent implements OnInit {
     }
     this.rebuildBarChart();
     this.showBarEditor = false;
+  }
+
+  // ── Stat Details Modal ──────────────────────────────────────────────────────
+  openStatDetails(metric: string): void {
+    if (metric === 'revenue') this.statModalTitle = 'Collected Revenue Guests';
+    else if (metric === 'bookings') this.statModalTitle = 'Recent Bookings';
+    else if (metric === 'arrivals') this.statModalTitle = 'Guests Checked In Today';
+    else if (metric === 'departures') this.statModalTitle = 'Guests Checking Out Today';
+    else return;
+
+    this.isStatModalOpen = true;
+    this.isStatLoading = true;
+    this.statModalBookings = [];
+
+    this.api.getStatDetails(metric, this.selectedRange).subscribe({
+      next: (data) => {
+        this.statModalBookings = data;
+        this.isStatLoading = false;
+      },
+      error: (err) => {
+        console.error('Failed to load stat details', err);
+        this.isStatLoading = false;
+      }
+    });
+  }
+
+  closeStatModal(): void {
+    this.isStatModalOpen = false;
+    this.statModalBookings = [];
   }
 
   trackByIndex(index: number): number { return index; }

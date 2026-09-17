@@ -21,6 +21,7 @@ export class SettingsComponent implements OnInit {
   logoPreview: string | null = null;
   selectedFile: File | null = null;
   isDragging = false;
+  showSecret = false;
 
   formData: any = {
     name: '',
@@ -29,7 +30,10 @@ export class SettingsComponent implements OnInit {
     contact_phone: '',
     branding_logo_url: '',
     branding_primary_color: '#008cff',
-    timezone: 'UTC'
+    timezone: 'UTC',
+    tax_rate: 10,
+    razorpay_key_id: '',
+    razorpay_key_secret: ''
   };
 
   timezones = [
@@ -136,6 +140,14 @@ export class SettingsComponent implements OnInit {
         this.isSaving = false;
         this.errorMsg = '❌ Failed to save settings. Please try again.';
       }
+    });
+  }
+
+  copyWidgetUrl(): void {
+    const url = `http://localhost:4201/?hotel=${this.formData.uuid}`;
+    navigator.clipboard.writeText(url).then(() => {
+      this.successMsg = '✅ Widget URL copied to clipboard!';
+      setTimeout(() => this.successMsg = '', 3000);
     });
   }
 }

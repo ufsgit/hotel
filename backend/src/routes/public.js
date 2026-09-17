@@ -4,10 +4,10 @@ const pool = require('../config/db');
 const notificationService = require('../services/notificationService');
 const pricingService = require('../services/pricingService');
 
-// GET /api/hotels/:slug — hotel info + branding
-router.get('/hotels/:slug', async (req, res) => {
+// GET /api/hotels/:uuid — hotel info + branding
+router.get('/hotels/:uuid', async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM hotels WHERE slug = ?', [req.params.slug]);
+        const [rows] = await pool.query('SELECT * FROM hotels WHERE uuid = ?', [req.params.uuid]);
         if (rows.length === 0) return res.status(404).json({ error: 'Hotel not found' });
         res.json(rows[0]);
     } catch (err) {
@@ -15,10 +15,10 @@ router.get('/hotels/:slug', async (req, res) => {
     }
 });
 
-// GET /api/hotels/:slug/offers
-router.get('/hotels/:slug/offers', async (req, res) => {
+// GET /api/hotels/:uuid/offers
+router.get('/hotels/:uuid/offers', async (req, res) => {
     try {
-        const [hotels] = await pool.query('SELECT id FROM hotels WHERE slug = ?', [req.params.slug]);
+        const [hotels] = await pool.query('SELECT id FROM hotels WHERE uuid = ?', [req.params.uuid]);
         if (hotels.length === 0) return res.status(404).json({ error: 'Hotel not found' });
 
         const [offers] = await pool.query(
@@ -31,13 +31,13 @@ router.get('/hotels/:slug/offers', async (req, res) => {
     }
 });
 
-// GET /api/hotels/:slug/availability
-router.get('/hotels/:slug/availability', async (req, res) => {
+// GET /api/hotels/:uuid/availability
+router.get('/hotels/:uuid/availability', async (req, res) => {
     const { checkIn, checkOut, guests } = req.query;
     if (!checkIn || !checkOut || !guests) return res.status(400).json({ error: 'Missing parameters' });
 
     try {
-        const [hotels] = await pool.query('SELECT id FROM hotels WHERE slug = ?', [req.params.slug]);
+        const [hotels] = await pool.query('SELECT id FROM hotels WHERE uuid = ?', [req.params.uuid]);
         if (hotels.length === 0) return res.status(404).json({ error: 'Hotel not found' });
 
         const [roomTypes] = await pool.query(
@@ -65,12 +65,12 @@ router.get('/hotels/:slug/availability', async (req, res) => {
     }
 });
 
-// POST /api/hotels/:slug/calculate-price
-router.post('/hotels/:slug/calculate-price', async (req, res) => {
+// POST /api/hotels/:uuid/calculate-price
+router.post('/hotels/:uuid/calculate-price', async (req, res) => {
     try {
         const { room_type_id, check_in_date, check_out_date, num_guests, promo_code } = req.body;
         
-        const [hotels] = await pool.query('SELECT id FROM hotels WHERE slug = ?', [req.params.slug]);
+        const [hotels] = await pool.query('SELECT id FROM hotels WHERE uuid = ?', [req.params.uuid]);
         if (hotels.length === 0) return res.status(404).json({ error: 'Hotel not found' });
 
         const pricing = await pricingService.calculatePrice(
@@ -83,12 +83,12 @@ router.post('/hotels/:slug/calculate-price', async (req, res) => {
     }
 });
 
-// POST /api/hotels/:slug/bookings
-router.post('/hotels/:slug/bookings', async (req, res) => {
+// POST /api/hotels/:uuid/bookings
+router.post('/hotels/:uuid/bookings', async (req, res) => {
     try {
         const { room_type_id, guest_name, guest_email, guest_phone, check_in_date, check_out_date, num_guests, promo_code } = req.body;
         
-        const [hotels] = await pool.query('SELECT id FROM hotels WHERE slug = ?', [req.params.slug]);
+        const [hotels] = await pool.query('SELECT id FROM hotels WHERE uuid = ?', [req.params.uuid]);
         if (hotels.length === 0) return res.status(404).json({ error: 'Hotel not found' });
 
         const pricing = await pricingService.calculatePrice(
@@ -118,38 +118,41 @@ router.post('/hotels/:slug/bookings', async (req, res) => {
     }
 });
 
-// POST /api/hotels/:slug/create-payment-order
-router.post('/hotels/:slug/create-payment-order', async (req, res) => {
+// POST /api/hotels/:uuid/create-payment-order
+router.post('/hotels/:uuid/create-payment-order', async (req, res) => {
     try {
-        const { booking_id, amount, is_partial } = req.body; // amount is in INR typically, or lowest currency unit
-        
-        // MVP: Using a dummy Razorpay initialization here. 
-        // In reality, keys should be fetched securely per hotel or from env variables.
+        const { booking_id, amount, is_partial } = req.body;
+
+        // Fetch hotel's own Razorpay credentials
+        const [hotels] = await pool.query('SELECT id, razorpay_key_id, razorpay_key_secret FROM hotels WHERE uuid = ?', [req.params.uuid]);
+        if (hotels.length === 0) return res.status(404).json({ error: 'Hotel not found' });
+
+        const hotel = hotels[0];
+        const keyId     = hotel.razorpay_key_id     || process.env.RAZORPAY_KEY_ID     || 'rzp_test_dummykey1234';
+        const keySecret = hotel.razorpay_key_secret || process.env.RAZORPAY_KEY_SECRET || 'dummysecret56789';
+
         const Razorpay = require('razorpay');
-        const rzp = new Razorpay({
-            key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_dummykey1234',
-            key_secret: process.env.RAZORPAY_KEY_SECRET || 'dummysecret56789',
-        });
+        const rzp = new Razorpay({ key_id: keyId, key_secret: keySecret });
 
         const amountToPay = is_partial ? Math.floor(amount / 2) : amount;
-
         const options = {
-            amount: Math.round(amountToPay * 100), // convert to paise/cents
-            currency: 'USD',
+            amount: Math.round(amountToPay * 100), // convert to paise
+            currency: 'INR',
             receipt: `rcpt_${booking_id}`
         };
 
         const order = await rzp.orders.create(options);
-        res.json({ success: true, order });
+        // Return key_id so the guest widget knows which key to initialise Razorpay with
+        res.json({ success: true, order, key_id: keyId });
     } catch (err) {
         console.error('Razorpay Order Error:', err);
-        // Fallback for scaffold if Razorpay fails (e.g. invalid keys)
-        res.json({ success: true, order: { id: `fake_order_${Date.now()}`, amount: req.body.amount * 100, currency: 'USD' } });
+        // Fallback if Razorpay call fails (e.g. invalid/missing keys)
+        res.json({ success: true, order: { id: `fake_order_${Date.now()}`, amount: req.body.amount * 100, currency: 'INR' }, key_id: 'rzp_test_dummykey1234' });
     }
 });
 
-// POST /api/hotels/:slug/verify-payment
-router.post('/hotels/:slug/verify-payment', async (req, res) => {
+// POST /api/hotels/:uuid/verify-payment
+router.post('/hotels/:uuid/verify-payment', async (req, res) => {
     try {
         const { booking_id, razorpay_payment_id, razorpay_order_id, razorpay_signature, is_partial } = req.body;
         

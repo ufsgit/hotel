@@ -3,8 +3,19 @@
     <i class="material-icons text-indigo-500 text-4xl">hotel</i>
     Dashboard Overview
   </h2>
-  <div class="text-sm bg-indigo-50 text-indigo-600 font-semibold px-4 py-1.5 rounded-full border border-indigo-100 flex items-center gap-1">
-    <i class="material-icons" style="font-size:14px">date_range</i> Last 7 Days
+  
+  <!-- Timeframe Filter Dropdown -->
+  <div class="relative">
+    <select [(ngModel)]="selectedRange" (change)="onRangeChange()"
+      class="appearance-none bg-indigo-50 text-indigo-700 font-bold px-4 py-2 pr-10 rounded-xl border border-indigo-100 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-colors shadow-sm cursor-pointer text-sm">
+      <option value="today">Today</option>
+      <option value="7d">Last 7 Days</option>
+      <option value="30d">Last 30 Days</option>
+      <option value="all">All Time</option>
+    </select>
+    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-indigo-500">
+      <i class="material-icons text-base">expand_more</i>
+    </div>
   </div>
 </div>
 
@@ -15,19 +26,19 @@
 <div *ngIf="!isLoading" @staggerList class="space-y-6">
   <!-- Stats Grid -->
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-    <div class="glass-card rounded-2xl p-6 stagger-item flex items-center gap-4">
+    <div (click)="openStatDetails('revenue')" class="glass-card rounded-2xl p-6 stagger-item flex items-center gap-4 cursor-pointer hover:bg-gray-50 transition-colors">
       <div class="flex-shrink-0 w-14 h-14 rounded-xl bg-blue-50 flex items-center justify-center shadow-sm">
         <i class="material-icons text-3xl text-blue-500">account_balance_wallet</i>
       </div>
       <div>
         <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Collected Revenue</div>
-        <div class="text-3xl font-extrabold text-indigo-950" [appCountUp]="stats.revenue" prefix="$" [decimals]="2"></div>
+        <div class="text-3xl font-extrabold text-indigo-950" [appCountUp]="stats.revenue" prefix="₹" [decimals]="2"></div>
         <div class="text-xs text-gray-400 mt-1">
-          Expected: <span class="font-semibold text-gray-500">${{ (stats.expectedRevenue || 0) | number:'1.2-2' }}</span>
+          Expected: <span class="font-semibold text-gray-500">₹{{ (stats.expectedRevenue || 0) | number:'1.2-2' }}</span>
         </div>
       </div>
     </div>
-    <div class="glass-card rounded-2xl p-6 stagger-item flex items-center gap-4">
+    <div (click)="openStatDetails('bookings')" class="glass-card rounded-2xl p-6 stagger-item flex items-center gap-4 cursor-pointer hover:bg-gray-50 transition-colors">
       <div class="flex-shrink-0 w-14 h-14 rounded-xl bg-purple-50 flex items-center justify-center shadow-sm">
         <i class="material-icons text-3xl text-purple-500">confirmation_number</i>
       </div>
@@ -36,7 +47,7 @@
         <div class="text-3xl font-extrabold text-indigo-950" [appCountUp]="stats.totalBookings"></div>
       </div>
     </div>
-    <div class="glass-card rounded-2xl p-6 stagger-item flex items-center gap-4">
+    <div (click)="openStatDetails('arrivals')" class="glass-card rounded-2xl p-6 stagger-item flex items-center gap-4 cursor-pointer hover:bg-gray-50 transition-colors">
       <div class="flex-shrink-0 w-14 h-14 rounded-xl bg-emerald-50 flex items-center justify-center shadow-sm">
         <i class="material-icons text-3xl text-emerald-500">login</i>
       </div>
@@ -45,7 +56,7 @@
         <div class="text-3xl font-extrabold text-emerald-600" [appCountUp]="stats.arrivalsToday"></div>
       </div>
     </div>
-    <div class="glass-card rounded-2xl p-6 stagger-item flex items-center gap-4">
+    <div (click)="openStatDetails('departures')" class="glass-card rounded-2xl p-6 stagger-item flex items-center gap-4 cursor-pointer hover:bg-gray-50 transition-colors">
       <div class="flex-shrink-0 w-14 h-14 rounded-xl bg-rose-50 flex items-center justify-center shadow-sm">
         <i class="material-icons text-3xl text-rose-500">logout</i>
       </div>
@@ -179,5 +190,49 @@
         <canvas baseChart [data]="barChartData" [options]="barChartOptions" [type]="'bar'"></canvas>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ── Stat Details Modal ──────────────────────────────────────────────── -->
+<div *ngIf="isStatModalOpen" class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" (click)="closeStatModal()">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden" (click)="$event.stopPropagation()">
+    
+    <div class="flex justify-between items-center p-6 border-b border-gray-100 flex-shrink-0">
+      <h2 class="text-xl font-bold text-indigo-950 flex items-center gap-2">
+        <i class="material-icons text-indigo-500">people</i> {{ statModalTitle }}
+      </h2>
+      <button (click)="closeStatModal()" class="text-gray-400 hover:text-gray-600">
+        <i class="material-icons">close</i>
+      </button>
+    </div>
+
+    <div class="p-6 overflow-y-auto flex-1">
+      <div *ngIf="isStatLoading" class="flex justify-center py-12">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-800"></div>
+      </div>
+      
+      <div *ngIf="!isStatLoading && statModalBookings.length === 0" class="text-center py-12 text-gray-500 font-medium">
+        No guests found for this selection.
+      </div>
+      
+      <div *ngIf="!isStatLoading && statModalBookings.length > 0" class="space-y-4">
+        <div *ngFor="let booking of statModalBookings" class="bg-gray-50 border border-gray-100 rounded-xl p-4 flex justify-between items-center hover:bg-indigo-50 transition-colors">
+          <div class="flex items-center gap-4">
+            <div class="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm">
+              {{ booking.guest_name ? booking.guest_name.charAt(0) : 'G' }}
+            </div>
+            <div>
+              <div class="text-sm font-bold text-gray-900">{{ booking.guest_name }}</div>
+              <div class="text-xs text-gray-500 font-medium">{{ booking.room_type_name }} &bull; Ref: BKG-{{ booking.id }}</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-sm font-bold text-gray-900">₹{{ booking.total_amount }}</div>
+            <div class="text-xs text-gray-500 mt-0.5">{{ booking.check_in_date | date:'MMM d' }} &rarr; {{ booking.check_out_date | date:'MMM d' }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>

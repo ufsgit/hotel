@@ -1,0 +1,538 @@
+<!-- ── Header ──────────────────────────────────────────────────────────────── -->
+<div class="mb-6 flex items-center justify-between">
+  <div class="flex items-center gap-3">
+    <i class="material-icons text-indigo-500 text-4xl">admin_panel_settings</i>
+    <div>
+      <h2 class="text-3xl font-extrabold text-indigo-950 tracking-tight">Super Admin</h2>
+      <p class="text-sm text-gray-500 font-medium">Platform-wide management & analytics</p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Global Messages ────────────────────────────────────────────────────── -->
+<div *ngIf="successMsg" class="mb-4 flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold px-4 py-3 rounded-xl shadow-sm">
+  <i class="material-icons text-emerald-500">check_circle</i> {{ successMsg }}
+</div>
+<div *ngIf="errorMsg" class="mb-4 flex items-center gap-3 bg-rose-50 border border-rose-200 text-rose-700 font-semibold px-4 py-3 rounded-xl shadow-sm">
+  <i class="material-icons text-rose-500">error</i> {{ errorMsg }}
+</div>
+
+<!-- ── Tab Bar ────────────────────────────────────────────────────────────── -->
+<div class="flex gap-1 bg-indigo-50 p-1 rounded-xl mb-6 w-fit">
+  <button (click)="setTab('overview')" [class.bg-white]="activeTab==='overview'" [class.shadow-sm]="activeTab==='overview'" [class.text-indigo-700]="activeTab==='overview'" [class.font-bold]="activeTab==='overview'"
+    class="px-5 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-indigo-700 transition-all flex items-center gap-2">
+    <i class="material-icons text-[18px]">dashboard</i> Overview
+  </button>
+  <button (click)="setTab('hotels')" [class.bg-white]="activeTab==='hotels'" [class.shadow-sm]="activeTab==='hotels'" [class.text-indigo-700]="activeTab==='hotels'" [class.font-bold]="activeTab==='hotels'"
+    class="px-5 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-indigo-700 transition-all flex items-center gap-2">
+    <i class="material-icons text-[18px]">business</i> Hotels
+  </button>
+  <button (click)="setTab('users')" [class.bg-white]="activeTab==='users'" [class.shadow-sm]="activeTab==='users'" [class.text-indigo-700]="activeTab==='users'" [class.font-bold]="activeTab==='users'"
+    class="px-5 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-indigo-700 transition-all flex items-center gap-2">
+    <i class="material-icons text-[18px]">group</i> Users
+  </button>
+  <button (click)="setTab('settings')" [class.bg-white]="activeTab==='settings'" [class.shadow-sm]="activeTab==='settings'" [class.text-indigo-700]="activeTab==='settings'" [class.font-bold]="activeTab==='settings'"
+    class="px-5 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-indigo-700 transition-all flex items-center gap-2">
+    <i class="material-icons text-[18px]">settings</i> Platform Settings
+  </button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 1: OVERVIEW
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div *ngIf="activeTab === 'overview'">
+
+  <!-- Stat Cards -->
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+    <div class="glass-card rounded-2xl p-5 flex flex-col gap-1">
+      <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Hotels</span>
+      <span class="text-3xl font-extrabold text-indigo-700">{{ platformStats?.totalHotels ?? '—' }}</span>
+    </div>
+    <div class="glass-card rounded-2xl p-5 flex flex-col gap-1">
+      <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Active Hotels</span>
+      <span class="text-3xl font-extrabold text-emerald-600">{{ platformStats?.activeHotels ?? '—' }}</span>
+    </div>
+    <div class="glass-card rounded-2xl p-5 flex flex-col gap-1">
+      <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Bookings</span>
+      <span class="text-3xl font-extrabold text-blue-700">{{ platformStats?.totalBookings ?? '—' }}</span>
+    </div>
+    <div class="glass-card rounded-2xl p-5 flex flex-col gap-1">
+      <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Platform Revenue</span>
+      <span class="text-2xl font-extrabold text-violet-700">{{ formatCurrency(platformStats?.totalRevenue) }}</span>
+    </div>
+    <div class="glass-card rounded-2xl p-5 flex flex-col gap-1">
+      <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Users</span>
+      <span class="text-3xl font-extrabold text-pink-600">{{ platformStats?.totalUsers ?? '—' }}</span>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- Top Hotels -->
+    <div class="glass-card rounded-2xl p-6">
+      <h3 class="text-base font-bold text-indigo-950 uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3 mb-4">
+        <i class="material-icons text-yellow-500" style="font-size:20px">emoji_events</i> Top Performing Hotels
+      </h3>
+      <div *ngIf="topHotels.length === 0" class="text-sm text-gray-400 text-center py-6">No data yet.</div>
+      <div *ngFor="let h of topHotels; let i = index" class="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0">
+        <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold text-white flex-shrink-0"
+          [style.background]="h.branding_primary_color || '#6366f1'">{{ i + 1 }}</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-bold text-gray-900 truncate">{{ h.name }}</div>
+          <div class="text-xs text-gray-400">{{ h.total_bookings }} bookings</div>
+        </div>
+        <div class="text-sm font-extrabold text-violet-700">{{ formatCurrency(h.revenue) }}</div>
+      </div>
+    </div>
+
+    <!-- Recent Bookings -->
+    <div class="glass-card rounded-2xl p-6">
+      <h3 class="text-base font-bold text-indigo-950 uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3 mb-4">
+        <i class="material-icons text-blue-500" style="font-size:20px">receipt_long</i> Recent Bookings (All Hotels)
+      </h3>
+      <div *ngIf="recentBookings.length === 0 && !isLoading" class="text-sm text-gray-400 text-center py-6">No bookings yet.</div>
+      <div *ngIf="isLoading" class="flex justify-center py-6"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+      <div class="space-y-2 max-h-80 overflow-y-auto pr-1">
+        <div *ngFor="let b of recentBookings" class="flex items-start gap-3 p-2.5 rounded-xl hover:bg-indigo-50/50 transition-colors">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-bold text-gray-900 truncate">{{ b.guest_name }}</span>
+              <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full flex-shrink-0" [class]="getStatusColor(b.booking_status)">{{ b.booking_status }}</span>
+            </div>
+            <div class="text-xs text-indigo-600 font-semibold truncate">{{ b.hotel_name }}</div>
+            <div class="text-xs text-gray-400">{{ b.room_type_name }} · {{ b.check_in_date | date:'MMM d' }} → {{ b.check_out_date | date:'MMM d' }}</div>
+          </div>
+          <div class="text-sm font-extrabold text-gray-800 flex-shrink-0">{{ formatCurrency(b.total_amount) }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 2: MANAGE HOTELS
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div *ngIf="activeTab === 'hotels'">
+  <div class="flex justify-between items-center mb-4">
+    <h3 class="text-lg font-bold text-indigo-950">All Hotels ({{ hotels.length }})</h3>
+    <button (click)="openCreateHotelModal()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 px-4 rounded-xl shadow-md transition-colors">
+      <i class="material-icons text-[18px]">add</i> New Hotel
+    </button>
+  </div>
+
+  <div class="space-y-3">
+    <div *ngFor="let hotel of hotels" class="glass-card rounded-2xl p-5">
+      <div class="flex flex-col md:flex-row md:items-center gap-4">
+        <!-- Color swatch + name -->
+        <div class="flex items-center gap-3 flex-1 min-w-0">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white font-extrabold text-lg flex-shrink-0"
+            [style.background]="hotel.branding_primary_color || '#6366f1'">
+            {{ hotel.name.charAt(0).toUpperCase() }}
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-extrabold text-gray-900">{{ hotel.name }}</span>
+              <span *ngIf="hotel.is_suspended" class="text-[10px] font-bold uppercase bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Suspended</span>
+              <span *ngIf="!hotel.is_suspended" class="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Active</span>
+              <span *ngIf="hotel.razorpay_key_id" class="text-[10px] font-bold uppercase bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Payment ✓</span>
+            </div>
+            <div class="text-xs text-gray-400 truncate">{{ hotel.address || 'No address set' }}</div>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="flex gap-5 text-center flex-shrink-0">
+          <div>
+            <div class="text-lg font-extrabold text-indigo-700">{{ hotel.total_bookings }}</div>
+            <div class="text-[10px] text-gray-400 uppercase font-bold">Bookings</div>
+          </div>
+          <div>
+            <div class="text-lg font-extrabold text-violet-700">{{ formatCurrency(hotel.revenue) }}</div>
+            <div class="text-[10px] text-gray-400 uppercase font-bold">Revenue</div>
+          </div>
+          <div>
+            <div class="text-lg font-extrabold text-pink-600">{{ hotel.user_count }}</div>
+            <div class="text-[10px] text-gray-400 uppercase font-bold">Staff</div>
+          </div>
+          <div>
+            <div class="text-lg font-extrabold text-amber-600">{{ hotel.room_type_count }}</div>
+            <div class="text-[10px] text-gray-400 uppercase font-bold">Room Types</div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex gap-2 flex-wrap flex-shrink-0">
+          <button (click)="copyWidgetUrl(hotel)" title="Copy Widget URL"
+            class="p-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 transition-colors">
+            <i class="material-icons text-[18px]">{{ copiedSlug === hotel.uuid ? 'check' : 'link' }}</i>
+          </button>
+          <button (click)="openStaffPanel(hotel)" title="View Staff"
+            class="p-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition-colors">
+            <i class="material-icons text-[18px]">group</i>
+          </button>
+          <button (click)="openAdminModal(hotel)" title="Add Admin"
+            class="p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 transition-colors">
+            <i class="material-icons text-[18px]">person_add</i>
+          </button>
+          <button (click)="openEditHotelModal(hotel)" title="Edit Hotel"
+            class="p-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-600 transition-colors">
+            <i class="material-icons text-[18px]">edit</i>
+          </button>
+          <button (click)="toggleSuspend(hotel)" [title]="hotel.is_suspended ? 'Activate Hotel' : 'Suspend Hotel'"
+            class="p-2 rounded-lg transition-colors"
+            [class]="hotel.is_suspended ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-600' : 'bg-orange-50 hover:bg-orange-100 text-orange-600'">
+            <i class="material-icons text-[18px]">{{ hotel.is_suspended ? 'play_circle' : 'pause_circle' }}</i>
+          </button>
+          <button (click)="confirmDeleteHotel(hotel)" title="Delete Hotel"
+            class="p-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 transition-colors">
+            <i class="material-icons text-[18px]">delete</i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 3: MANAGE USERS
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div *ngIf="activeTab === 'users'">
+  <div class="flex flex-col md:flex-row gap-3 mb-4 items-start md:items-center justify-between">
+    <h3 class="text-lg font-bold text-indigo-950">All Users ({{ filteredUsers.length }})</h3>
+    <div class="flex gap-2 flex-wrap">
+      <input type="text" [(ngModel)]="userSearch" (ngModelChange)="applyUserFilter()" placeholder="Search name or email..."
+        class="px-4 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+      <select [(ngModel)]="userHotelFilter" (ngModelChange)="applyUserFilter()"
+        class="px-4 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-white">
+        <option value="">All Hotels</option>
+        <option *ngFor="let h of uniqueHotelNames" [value]="h">{{ h }}</option>
+      </select>
+    </div>
+  </div>
+
+  <div *ngIf="usersLoading" class="flex justify-center py-16"><div class="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div></div>
+
+  <div *ngIf="!usersLoading" class="glass-card rounded-2xl overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-indigo-50/60">
+        <tr>
+          <th class="text-left px-5 py-3 text-xs font-extrabold text-gray-500 uppercase tracking-wider">Name</th>
+          <th class="text-left px-5 py-3 text-xs font-extrabold text-gray-500 uppercase tracking-wider">Email</th>
+          <th class="text-left px-5 py-3 text-xs font-extrabold text-gray-500 uppercase tracking-wider">Hotel</th>
+          <th class="text-left px-5 py-3 text-xs font-extrabold text-gray-500 uppercase tracking-wider">Role</th>
+          <th class="text-left px-5 py-3 text-xs font-extrabold text-gray-500 uppercase tracking-wider">Joined</th>
+          <th class="text-right px-5 py-3 text-xs font-extrabold text-gray-500 uppercase tracking-wider">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let u of filteredUsers" class="border-t border-gray-50 hover:bg-indigo-50/30 transition-colors">
+          <td class="px-5 py-3 font-semibold text-gray-900">{{ u.name }}</td>
+          <td class="px-5 py-3 text-gray-500">{{ u.email }}</td>
+          <td class="px-5 py-3 text-indigo-600 font-medium">{{ u.hotel_name || '—' }}</td>
+          <td class="px-5 py-3">
+            <span class="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full"
+              [class]="u.role === 'owner' ? 'bg-violet-100 text-violet-700' : 'bg-gray-100 text-gray-600'">{{ u.role }}</span>
+          </td>
+          <td class="px-5 py-3 text-gray-400 text-xs">{{ u.created_at | date:'MMM d, yyyy' }}</td>
+          <td class="px-5 py-3 text-right">
+            <div class="flex gap-2 justify-end">
+              <button (click)="impersonate(u)" title="Login as this user"
+                class="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 transition-colors">
+                <i class="material-icons text-[16px]">login</i>
+              </button>
+              <button (click)="openResetModal(u)" title="Reset password"
+                class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-600 transition-colors">
+                <i class="material-icons text-[16px]">lock_reset</i>
+              </button>
+              <button (click)="confirmDeleteUser(u)" title="Delete user"
+                class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 transition-colors">
+                <i class="material-icons text-[16px]">delete</i>
+              </button>
+            </div>
+          </td>
+        </tr>
+        <tr *ngIf="filteredUsers.length === 0">
+          <td colspan="6" class="text-center py-10 text-gray-400">No users found.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 4: PLATFORM SETTINGS
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div *ngIf="activeTab === 'settings'">
+  <div *ngIf="settingsLoading" class="flex justify-center py-16"><div class="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div></div>
+
+  <div *ngIf="!settingsLoading && settingsForm" class="max-w-2xl space-y-6">
+
+    <!-- Default Branding -->
+    <div class="glass-card rounded-2xl p-6 space-y-4">
+      <h3 class="text-base font-bold text-indigo-950 uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
+        <i class="material-icons text-indigo-400" style="font-size:20px">palette</i> Default Branding
+      </h3>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Default Primary Color</label>
+        <div class="flex items-center gap-3">
+          <input type="color" [(ngModel)]="settingsForm.default_primary_color" class="h-10 w-16 rounded-lg border border-gray-200 cursor-pointer">
+          <span class="text-sm font-mono text-gray-600">{{ settingsForm.default_primary_color }}</span>
+        </div>
+        <p class="text-xs text-gray-400 mt-1">Applied to new hotels that haven't set their own color.</p>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Default Tax Rate (%)</label>
+        <input type="number" [(ngModel)]="settingsForm.default_tax_rate" min="0" max="100" step="0.5"
+          class="w-40 px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm font-bold text-gray-800">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Terms of Service URL</label>
+        <input type="url" [(ngModel)]="settingsForm.terms_of_service_url" placeholder="https://yourplatform.com/terms"
+          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm text-gray-800">
+      </div>
+    </div>
+
+    <!-- SMTP / Email Config -->
+    <div class="glass-card rounded-2xl p-6 space-y-4">
+      <h3 class="text-base font-bold text-indigo-950 uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
+        <i class="material-icons text-blue-400" style="font-size:20px">email</i> Email (SMTP) Configuration
+      </h3>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">SMTP Host</label>
+          <input type="text" [(ngModel)]="settingsForm.smtp_host" placeholder="smtp.gmail.com"
+            class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm font-mono text-gray-800">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">SMTP Port</label>
+          <input type="number" [(ngModel)]="settingsForm.smtp_port" placeholder="587"
+            class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm font-mono text-gray-800">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">SMTP Username</label>
+          <input type="text" [(ngModel)]="settingsForm.smtp_user" placeholder="your@email.com"
+            class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm font-mono text-gray-800">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">SMTP Password</label>
+          <div class="relative">
+            <input [type]="showSmtpPass ? 'text' : 'password'" [(ngModel)]="settingsForm.smtp_pass" placeholder="••••••••"
+              class="w-full px-4 py-2.5 pr-10 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm font-mono text-gray-800">
+            <button type="button" (click)="showSmtpPass = !showSmtpPass" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <i class="material-icons text-[18px]">{{ showSmtpPass ? 'visibility_off' : 'visibility' }}</i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Twilio / SMS Config -->
+    <div class="glass-card rounded-2xl p-6 space-y-4">
+      <h3 class="text-base font-bold text-indigo-950 uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
+        <i class="material-icons text-green-500" style="font-size:20px">sms</i> SMS (Twilio) Configuration
+      </h3>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Account SID</label>
+          <input type="text" [(ngModel)]="settingsForm.twilio_account_sid" placeholder="ACxxxxxxxxxxxxxxxx"
+            class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm font-mono text-gray-800">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Auth Token</label>
+          <div class="relative">
+            <input [type]="showTwilioToken ? 'text' : 'password'" [(ngModel)]="settingsForm.twilio_auth_token" placeholder="••••••••"
+              class="w-full px-4 py-2.5 pr-10 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm font-mono text-gray-800">
+            <button type="button" (click)="showTwilioToken = !showTwilioToken" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <i class="material-icons text-[18px]">{{ showTwilioToken ? 'visibility_off' : 'visibility' }}</i>
+            </button>
+          </div>
+        </div>
+        <div class="col-span-2">
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Twilio Phone Number</label>
+          <input type="text" [(ngModel)]="settingsForm.twilio_phone_number" placeholder="+1234567890"
+            class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm font-mono text-gray-800">
+        </div>
+      </div>
+    </div>
+
+    <!-- Save -->
+    <div class="flex justify-end">
+      <button (click)="saveSettings()" [disabled]="settingsSaving"
+        class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-md text-sm">
+        <i class="material-icons text-base" *ngIf="!settingsSaving">save</i>
+        <span *ngIf="settingsSaving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+        {{ settingsSaving ? 'Saving...' : 'Save Platform Settings' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     MODALS & PANELS
+     ═══════════════════════════════════════════════════════════════════════════ -->
+
+<!-- ── Create / Edit Hotel Modal ──────────────────────────────────────────── -->
+<div *ngIf="showHotelModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(15,10,60,0.55);">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+    <div class="flex items-center justify-between">
+      <h3 class="text-lg font-extrabold text-indigo-950">{{ editingHotel ? 'Edit Hotel' : 'Add New Hotel' }}</h3>
+      <button (click)="closeHotelModal()" class="text-gray-400 hover:text-gray-700"><i class="material-icons">close</i></button>
+    </div>
+    <div *ngIf="hotelError" class="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{{ hotelError }}</div>
+    <div class="space-y-3">
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Hotel Name *</label>
+        <input type="text" [(ngModel)]="hotelForm.name" placeholder="e.g. Grand Oasis Hotel"
+          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Address</label>
+        <input type="text" [(ngModel)]="hotelForm.address" placeholder="City, Country"
+          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Contact Email</label>
+          <input type="email" [(ngModel)]="hotelForm.contact_email" placeholder="hotel@email.com"
+            class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Phone</label>
+          <input type="tel" [(ngModel)]="hotelForm.contact_phone" placeholder="+91 ..."
+            class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Brand Color</label>
+        <div class="flex items-center gap-3">
+          <input type="color" [(ngModel)]="hotelForm.branding_primary_color" class="h-10 w-16 rounded-lg border border-gray-200 cursor-pointer">
+          <span class="text-sm font-mono text-gray-500">{{ hotelForm.branding_primary_color }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="flex gap-3 pt-2">
+      <button (click)="closeHotelModal()" class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+      <button (click)="submitHotel()" [disabled]="hotelSubmitting"
+        class="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white text-sm font-bold flex items-center justify-center gap-2">
+        <span *ngIf="hotelSubmitting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+        {{ hotelSubmitting ? 'Saving...' : (editingHotel ? 'Save Changes' : 'Create Hotel') }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Create Admin Modal ─────────────────────────────────────────────────── -->
+<div *ngIf="showAdminModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(15,10,60,0.55);">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+    <div class="flex items-center justify-between">
+      <h3 class="text-lg font-extrabold text-indigo-950">Add Admin — <span class="text-indigo-600">{{ adminForm.hotel_name }}</span></h3>
+      <button (click)="closeAdminModal()" class="text-gray-400 hover:text-gray-700"><i class="material-icons">close</i></button>
+    </div>
+    <div *ngIf="adminError" class="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{{ adminError }}</div>
+    <div class="space-y-3">
+      <input type="text" [(ngModel)]="adminForm.name" placeholder="Full Name"
+        class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm">
+      <input type="email" [(ngModel)]="adminForm.email" placeholder="Email Address"
+        class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm">
+      <input type="password" [(ngModel)]="adminForm.password" placeholder="Password (min. 6 chars)"
+        class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm">
+    </div>
+    <div class="flex gap-3 pt-2">
+      <button (click)="closeAdminModal()" class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+      <button (click)="submitAdmin()" [disabled]="adminSubmitting"
+        class="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white text-sm font-bold flex items-center justify-center gap-2">
+        <span *ngIf="adminSubmitting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+        {{ adminSubmitting ? 'Creating...' : 'Create Admin' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Staff Side Panel ───────────────────────────────────────────────────── -->
+<div *ngIf="showStaffPanel" class="fixed inset-0 z-50 flex justify-end" style="background:rgba(15,10,60,0.4);" (click)="closeStaffPanel()">
+  <div class="bg-white w-full max-w-md h-full shadow-2xl p-6 overflow-y-auto flex flex-col gap-4" (click)="$event.stopPropagation()">
+    <div class="flex items-center justify-between">
+      <div>
+        <h3 class="text-lg font-extrabold text-indigo-950">Staff — {{ staffPanelHotel?.name }}</h3>
+        <p class="text-xs text-gray-400">All users for this hotel</p>
+      </div>
+      <div class="flex gap-2">
+        <button (click)="openAdminModal(staffPanelHotel)" class="p-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-sm font-bold flex items-center gap-1">
+          <i class="material-icons text-[16px]">person_add</i> Add
+        </button>
+        <button (click)="closeStaffPanel()" class="text-gray-400 hover:text-gray-700 p-2"><i class="material-icons">close</i></button>
+      </div>
+    </div>
+    <div *ngIf="staffLoading" class="flex justify-center py-10"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+    <div *ngIf="!staffLoading && staffList.length === 0" class="text-center text-gray-400 py-10">No staff yet. Add one!</div>
+    <div *ngFor="let u of staffList" class="flex items-center gap-3 p-3 rounded-xl hover:bg-indigo-50/40 border border-gray-100">
+      <div class="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-extrabold text-sm flex-shrink-0">
+        {{ u.name.charAt(0).toUpperCase() }}
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="font-bold text-gray-900 text-sm truncate">{{ u.name }}</div>
+        <div class="text-xs text-gray-400 truncate">{{ u.email }}</div>
+        <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full" [class]="u.role === 'owner' ? 'bg-violet-100 text-violet-700' : 'bg-gray-100 text-gray-600'">{{ u.role }}</span>
+      </div>
+      <div class="flex gap-1.5 flex-shrink-0">
+        <button (click)="impersonate(u)" title="Login as" class="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 transition-colors">
+          <i class="material-icons text-[15px]">login</i>
+        </button>
+        <button (click)="openResetModal(u)" title="Reset password" class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-600 transition-colors">
+          <i class="material-icons text-[15px]">lock_reset</i>
+        </button>
+        <button (click)="confirmDeleteUser(u)" title="Delete" class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 transition-colors">
+          <i class="material-icons text-[15px]">delete</i>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Reset Password Modal ───────────────────────────────────────────────── -->
+<div *ngIf="showResetModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(15,10,60,0.55);">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+    <h3 class="text-lg font-extrabold text-indigo-950">Reset Password — <span class="text-indigo-600">{{ resetUser?.name }}</span></h3>
+    <div *ngIf="resetError" class="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{{ resetError }}</div>
+    <input type="password" [(ngModel)]="newPassword" placeholder="New password (min 6 chars)"
+      class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none text-sm">
+    <div class="flex gap-3">
+      <button (click)="closeResetModal()" class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600">Cancel</button>
+      <button (click)="submitReset()" [disabled]="resetSubmitting"
+        class="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white text-sm font-bold flex items-center justify-center gap-2">
+        <span *ngIf="resetSubmitting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+        {{ resetSubmitting ? 'Resetting...' : 'Reset Password' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Delete Hotel Confirm ───────────────────────────────────────────────── -->
+<div *ngIf="showDeleteHotelConfirm" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(15,10,60,0.55);">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4 text-center">
+    <div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto">
+      <i class="material-icons text-red-500 text-3xl">warning</i>
+    </div>
+    <h3 class="text-lg font-extrabold text-gray-900">Delete Hotel?</h3>
+    <p class="text-sm text-gray-500">This will permanently delete <strong>{{ hotelToDelete?.name }}</strong> and all its bookings, rooms, and staff accounts. This cannot be undone.</p>
+    <div class="flex gap-3 pt-2">
+      <button (click)="cancelDeleteHotel()" class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600">Cancel</button>
+      <button (click)="executeDeleteHotel()" class="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold">Yes, Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Delete User Confirm ────────────────────────────────────────────────── -->
+<div *ngIf="showDeleteUserConfirm" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(15,10,60,0.55);">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4 text-center">
+    <div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto">
+      <i class="material-icons text-red-500 text-3xl">person_remove</i>
+    </div>
+    <h3 class="text-lg font-extrabold text-gray-900">Delete User?</h3>
+    <p class="text-sm text-gray-500">Remove <strong>{{ userToDelete?.name }}</strong> ({{ userToDelete?.email }}) permanently?</p>
+    <div class="flex gap-3 pt-2">
+      <button (click)="cancelDeleteUser()" class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600">Cancel</button>
+      <button (click)="executeDeleteUser()" class="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold">Yes, Delete</button>
+    </div>
+  </div>
+</div>

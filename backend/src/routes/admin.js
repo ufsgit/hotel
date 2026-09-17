@@ -29,6 +29,28 @@ const upload = multer({
     }
 });
 
+// Multer config — store guest documents in /uploads/documents/
+const docStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const dir = path.join(__dirname, '../../uploads/documents');
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        cb(null, `guest_doc_${Date.now()}${ext}`);
+    }
+});
+const uploadDoc = multer({
+    storage: docStorage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB for documents
+    fileFilter: (req, file, cb) => {
+        // Allow images and PDFs
+        if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') cb(null, true);
+        else cb(new Error('Only image and PDF files are allowed'));
+    }
+});
+
 // Auth routes (not protected by auth middleware)
 router.post('/login', async (req, res) => {
     try {
@@ -47,12 +69,12 @@ router.post('/login', async (req, res) => {
         }
 
         const token = jwt.sign(
-            { id: user.id, hotel_id: user.hotel_id, role: user.role },
+            { id: user.id, role: user.role },
             process.env.JWT_SECRET || 'fallback_secret',
             { expiresIn: '1d' }
         );
 
-        res.json({ token, user: { id: user.id, name: user.name, role: user.role, hotel_id: user.hotel_id } });
+        res.json({ token, user: { id: user.id, name: user.name, role: user.role } });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -61,7 +83,21 @@ router.post('/login', async (req, res) => {
 // Admin dashboard routes (protected by auth middleware)
 router.use(auth);
 
-// --- LOGO UPLOAD ---
+router.get('/my-hotels', async (req, res) => {
+    try {
+        const [hotels] = await pool.query(`
+            SELECT h.id, h.name, h.slug, h.branding_primary_color, uh.role, uh.permissions 
+            FROM hotels h
+            JOIN user_hotels uh ON h.id = uh.hotel_id
+            WHERE uh.user_id = ?
+            ORDER BY h.name ASC
+        `, [req.user.id]);
+        res.json(hotels);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 router.post('/upload-logo', upload.single('logo'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -72,6 +108,155 @@ router.post('/upload-logo', upload.single('logo'), async (req, res) => {
         // Persist to DB immediately
         await pool.query('UPDATE hotels SET branding_logo_url = ? WHERE id = ?', [logoUrl, req.user.hotel_id]);
         res.json({ url: logoUrl });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+// --- STAFF MANAGEMENT (For Hotel Owners) ---
+router.get('/staff', async (req, res) => {
+    try {
+        if (req.user.role !== 'owner') return res.status(403).json({ error: 'Only owners can manage staff.' });
+        
+        const [rows] = await pool.query(`
+            SELECT u.id, u.name, u.email, uh.role, uh.permissions, uh.created_at 
+            FROM users u
+            JOIN user_hotels uh ON u.id = uh.user_id
+            WHERE uh.hotel_id = ? 
+            ORDER BY uh.role, u.name
+        `, [req.user.hotel_id]);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/staff', async (req, res) => {
+    try {
+        const { name, email, password, target_hotel_id, permissions } = req.body;
+        const hotelId = target_hotel_id || req.user.hotel_id;
+
+        // Ensure user is an owner for the requested hotel
+        const [rows] = await pool.query('SELECT role FROM user_hotels WHERE user_id = ? AND hotel_id = ?', [req.user.id, hotelId]);
+        if (rows.length === 0 || rows[0].role !== 'owner') {
+            return res.status(403).json({ error: 'Only owners can add staff to this property.' });
+        }
+        
+        if (!name || !email || !password) return res.status(400).json({ error: 'name, email, and password are required.' });
+
+        const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
+        let userId;
+
+        if (existing.length > 0) {
+            userId = existing[0].id;
+        } else {
+            const password_hash = await bcrypt.hash(password, 10);
+            const [result] = await pool.query(
+                'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
+                [name, email, password_hash, 'user']
+            );
+            userId = result.insertId;
+        }
+
+        await pool.query(
+            'INSERT IGNORE INTO user_hotels (user_id, hotel_id, role, permissions) VALUES (?, ?, ?, ?)',
+            [userId, hotelId, 'staff', permissions ? JSON.stringify(permissions) : null]
+        );
+
+        res.status(201).json({ message: 'Staff added successfully.' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.delete('/staff/:id', async (req, res) => {
+    try {
+        if (req.user.role !== 'owner') return res.status(403).json({ error: 'Only owners can remove staff.' });
+        
+        const targetUserId = parseInt(req.params.id);
+        if (targetUserId === req.user.id) return res.status(400).json({ error: 'You cannot remove yourself.' });
+
+        await pool.query('DELETE FROM user_hotels WHERE user_id = ? AND hotel_id = ?', [targetUserId, req.user.hotel_id]);
+        res.json({ message: 'Staff removed successfully.' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.put('/staff/:id', async (req, res) => {
+    try {
+        if (req.user.role !== 'owner') return res.status(403).json({ error: 'Only owners can edit staff.' });
+        
+        const targetUserId = parseInt(req.params.id);
+        const { name, email, role, password, permissions } = req.body;
+        
+        // Ensure the target user actually belongs to this hotel
+        const [rows] = await pool.query('SELECT * FROM user_hotels WHERE user_id = ? AND hotel_id = ?', [targetUserId, req.user.hotel_id]);
+        if (rows.length === 0) return res.status(404).json({ error: 'Staff member not found in this property.' });
+
+        // Update the user's name, email, and optionally password
+        if (name || email || password) {
+            let query = 'UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email)';
+            const params = [name, email];
+            if (password) {
+                const password_hash = await bcrypt.hash(password, 10);
+                query += ', password_hash = ?';
+                params.push(password_hash);
+            }
+            query += ' WHERE id = ?';
+            params.push(targetUserId);
+            await pool.query(query, params);
+        }
+        
+        // Update their role and permissions for this hotel
+        if (role || permissions !== undefined) {
+            // Prevent changing own role if they are the last owner, but for now just prevent changing own role entirely
+            if (targetUserId === req.user.id && role && role !== 'owner') {
+                return res.status(400).json({ error: 'You cannot downgrade your own role.' });
+            }
+            
+            let uhQuery = 'UPDATE user_hotels SET ';
+            const uhParams = [];
+            const uhSet = [];
+            
+            if (role && (role === 'owner' || role === 'staff')) {
+                uhSet.push('role = ?');
+                uhParams.push(role);
+            }
+            
+            if (permissions !== undefined) {
+                uhSet.push('permissions = ?');
+                uhParams.push(permissions ? JSON.stringify(permissions) : null);
+            }
+            
+            if (uhSet.length > 0) {
+                uhQuery += uhSet.join(', ') + ' WHERE user_id = ? AND hotel_id = ?';
+                uhParams.push(targetUserId, req.user.hotel_id);
+                await pool.query(uhQuery, uhParams);
+            }
+        }
+
+        res.json({ message: 'Staff member updated successfully.' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- GUEST DOCUMENT UPLOAD ---
+router.post('/upload-guest-document/:bookingId', uploadDoc.single('document'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+        const bookingId = req.params.bookingId;
+        
+        // Verify booking belongs to this hotel
+        const [bookings] = await pool.query('SELECT id FROM bookings WHERE id = ? AND hotel_id = ?', [bookingId, req.user.hotel_id]);
+        if (bookings.length === 0) return res.status(404).json({ error: 'Booking not found' });
+
+        const host = req.get('host');
+        const protocol = req.protocol;
+        const docUrl = `${protocol}://${host}/uploads/documents/${req.file.filename}`;
+        
+        await pool.query('UPDATE bookings SET guest_document_url = ? WHERE id = ?', [docUrl, bookingId]);
+        res.json({ url: docUrl });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -88,7 +273,13 @@ router.get('/room-types', async (req, res) => {
 
 router.get('/bookings', async (req, res) => {
     try {
-        const [bookings] = await pool.query('SELECT * FROM bookings WHERE hotel_id = ? ORDER BY created_at DESC', [req.user.hotel_id]);
+        const [bookings] = await pool.query(`
+            SELECT b.*, rt.name as room_type_name 
+            FROM bookings b 
+            LEFT JOIN room_types rt ON b.room_type_id = rt.id 
+            WHERE b.hotel_id = ? 
+            ORDER BY b.created_at DESC
+        `, [req.user.hotel_id]);
         res.json(bookings);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -198,7 +389,12 @@ router.post('/upload-offer-banner', uploadOfferBanner.single('banner'), async (r
 router.post('/room-types', async (req, res) => {
     try {
         const { name, description, base_price, default_capacity, max_capacity, max_occupancy, extra_bed_allowed, extra_bed_price, total_rooms, photos, amenities } = req.body;
-        const maxOcc = max_occupancy || max_capacity || default_capacity || 2;
+        
+        // Ensure default_capacity has a fallback
+        const defCap = default_capacity || 2;
+        // Compute maxOcc dynamically: default_capacity + 1 if extra_bed_allowed is true
+        const maxOcc = defCap + (extra_bed_allowed ? 1 : 0);
+
         let photosJson = null;
         if (photos) {
             photosJson = JSON.stringify(Array.isArray(photos) ? photos : [photos]);
@@ -208,8 +404,8 @@ router.post('/room-types', async (req, res) => {
             amenitiesJson = JSON.stringify(Array.isArray(amenities) ? amenities : [amenities]);
         }
         const [result] = await pool.query(
-            'INSERT INTO room_types (hotel_id, name, description, base_price, max_occupancy, extra_bed_allowed, extra_bed_price, total_rooms, photos, amenities) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [req.user.hotel_id, name || '', description || '', base_price || 0, maxOcc, extra_bed_allowed ? 1 : 0, extra_bed_price || 0, total_rooms || 10, photosJson, amenitiesJson]
+            'INSERT INTO room_types (hotel_id, name, description, default_capacity, base_price, max_occupancy, extra_bed_allowed, extra_bed_price, total_rooms, photos, amenities) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [req.user.hotel_id, name || '', description || '', defCap, base_price || 0, maxOcc, extra_bed_allowed ? 1 : 0, extra_bed_price || 0, total_rooms || 10, photosJson, amenitiesJson]
         );
         res.json({ id: result.insertId, message: 'Room type created' });
     } catch (err) {
@@ -220,7 +416,10 @@ router.post('/room-types', async (req, res) => {
 router.put('/room-types/:id', async (req, res) => {
     try {
         const { name, description, base_price, default_capacity, max_capacity, max_occupancy, extra_bed_allowed, extra_bed_price, total_rooms, photos, amenities } = req.body;
-        const maxOcc = max_occupancy || max_capacity || default_capacity || 2;
+        
+        const defCap = default_capacity || 2;
+        const maxOcc = defCap + (extra_bed_allowed ? 1 : 0);
+
         let photosJson = null;
         if (photos) {
             photosJson = JSON.stringify(Array.isArray(photos) ? photos : [photos]);
@@ -230,8 +429,8 @@ router.put('/room-types/:id', async (req, res) => {
             amenitiesJson = JSON.stringify(Array.isArray(amenities) ? amenities : (amenities ? [amenities] : []));
         }
         await pool.query(
-            'UPDATE room_types SET name = ?, description = ?, base_price = ?, max_occupancy = ?, extra_bed_allowed = ?, extra_bed_price = ?, total_rooms = COALESCE(?, total_rooms), photos = COALESCE(?, photos), amenities = COALESCE(?, amenities) WHERE id = ? AND hotel_id = ?',
-            [name, description || '', base_price || 0, maxOcc, extra_bed_allowed ? 1 : 0, extra_bed_price || 0, total_rooms, photosJson, amenitiesJson, req.params.id, req.user.hotel_id]
+            'UPDATE room_types SET name = ?, description = ?, default_capacity = ?, base_price = ?, max_occupancy = ?, extra_bed_allowed = ?, extra_bed_price = ?, total_rooms = COALESCE(?, total_rooms), photos = COALESCE(?, photos), amenities = COALESCE(?, amenities) WHERE id = ? AND hotel_id = ?',
+            [name, description || '', defCap, base_price || 0, maxOcc, extra_bed_allowed ? 1 : 0, extra_bed_price || 0, total_rooms, photosJson, amenitiesJson, req.params.id, req.user.hotel_id]
         );
         res.json({ message: 'Room type updated' });
     } catch (err) {
@@ -253,6 +452,18 @@ router.delete('/room-types/:id', async (req, res) => {
 router.get('/reports/stats', async (req, res) => {
     try {
         const hotelId = req.user.hotel_id;
+        const range = req.query.range || '7d';
+        
+        let dateFilter = '';
+        let dateFilterParams = [];
+        
+        if (range === 'today') {
+            dateFilter = 'AND DATE(created_at) = CURDATE()';
+        } else if (range === '7d') {
+            dateFilter = 'AND created_at >= CURDATE() - INTERVAL 6 DAY';
+        } else if (range === '30d') {
+            dateFilter = 'AND created_at >= CURDATE() - INTERVAL 29 DAY';
+        }
         
         // Collected Revenue: only paid or partial bookings
         const [revRow] = await pool.query(
@@ -260,45 +471,105 @@ router.get('/reports/stats', async (req, res) => {
                 WHEN payment_status = 'paid' THEN total_amount 
                 WHEN payment_status = 'partial' THEN COALESCE(amount_paid, 0)
                 ELSE 0 
-            END), 0) as revenue FROM bookings WHERE hotel_id = ? AND booking_status != 'cancelled'`,
-            [hotelId]
+            END), 0) as revenue FROM bookings WHERE hotel_id = ? AND booking_status != 'cancelled' ${dateFilter}`,
+            [hotelId, ...dateFilterParams]
         );
 
-        // Expected Revenue: all non-cancelled bookings (including pay-at-hotel)
+        // Expected Revenue: all non-cancelled bookings
         const [expectedRevRow] = await pool.query(
-            `SELECT COALESCE(SUM(total_amount), 0) as expected_revenue FROM bookings WHERE hotel_id = ? AND booking_status != 'cancelled'`,
-            [hotelId]
+            `SELECT COALESCE(SUM(total_amount), 0) as expected_revenue FROM bookings WHERE hotel_id = ? AND booking_status != 'cancelled' ${dateFilter}`,
+            [hotelId, ...dateFilterParams]
         );
         
         // Total bookings
-        const [bkRow] = await pool.query(`SELECT COUNT(*) as total_bookings FROM bookings WHERE hotel_id = ?`, [hotelId]);
+        const [bkRow] = await pool.query(`SELECT COUNT(*) as total_bookings FROM bookings WHERE hotel_id = ? ${dateFilter}`, [hotelId, ...dateFilterParams]);
         
-        // Checked In Today (bookings with status 'checked_in' and check_in_date = today)
+        // Checked In Today (always today)
         const [arrRow] = await pool.query(`SELECT COUNT(*) as arrivals FROM bookings WHERE hotel_id = ? AND booking_status = 'checked_in' AND check_in_date = CURDATE()`, [hotelId]);
         
-        // Checked Out Today (bookings with status 'checked_out' and check_out_date = today)
+        // Checked Out Today (always today)
         const [depRow] = await pool.query(`SELECT COUNT(*) as departures FROM bookings WHERE hotel_id = ? AND booking_status = 'checked_out' AND check_out_date = CURDATE()`, [hotelId]);
 
-        // 7-Day Revenue Trend
-        const [revTrendRows] = await pool.query(`
-            SELECT 
-                DATE_FORMAT(d.dt, '%a') as day_name,
-                COALESCE(SUM(b.total_amount), 0) as daily_revenue
-            FROM (
-                SELECT CURDATE() - INTERVAL 6 DAY as dt UNION ALL
-                SELECT CURDATE() - INTERVAL 5 DAY UNION ALL
-                SELECT CURDATE() - INTERVAL 4 DAY UNION ALL
-                SELECT CURDATE() - INTERVAL 3 DAY UNION ALL
-                SELECT CURDATE() - INTERVAL 2 DAY UNION ALL
-                SELECT CURDATE() - INTERVAL 1 DAY UNION ALL
-                SELECT CURDATE()
-            ) d
-            LEFT JOIN bookings b ON b.hotel_id = ? 
-                AND b.booking_status != 'cancelled'
-                AND b.check_in_date = d.dt
-            GROUP BY d.dt
-            ORDER BY d.dt ASC
-        `, [hotelId]);
+        // Revenue Trend
+        let trendQuery = '';
+        if (range === 'today') {
+            trendQuery = `
+                SELECT 
+                    HOUR(created_at) as time_key,
+                    DATE_FORMAT(created_at, '%h %p') as display_label,
+                    COALESCE(SUM(total_amount), 0) as daily_revenue
+                FROM bookings
+                WHERE hotel_id = ? AND booking_status != 'cancelled' ${dateFilter}
+                GROUP BY HOUR(created_at), DATE_FORMAT(created_at, '%h %p')
+                ORDER BY HOUR(created_at) ASC
+            `;
+        } else if (range === 'all') {
+            trendQuery = `
+                SELECT 
+                    DATE_FORMAT(created_at, '%Y-%m') as time_key,
+                    DATE_FORMAT(created_at, '%b %Y') as display_label,
+                    COALESCE(SUM(total_amount), 0) as daily_revenue
+                FROM bookings
+                WHERE hotel_id = ? AND booking_status != 'cancelled'
+                GROUP BY DATE_FORMAT(created_at, '%Y-%m'), DATE_FORMAT(created_at, '%b %Y')
+                ORDER BY DATE_FORMAT(created_at, '%Y-%m') ASC
+            `;
+        } else {
+            // 7d or 30d
+            trendQuery = `
+                SELECT 
+                    DATE(created_at) as time_key,
+                    DATE_FORMAT(created_at, '%b %d') as display_label,
+                    COALESCE(SUM(total_amount), 0) as daily_revenue
+                FROM bookings
+                WHERE hotel_id = ? AND booking_status != 'cancelled' ${dateFilter}
+                GROUP BY DATE(created_at), DATE_FORMAT(created_at, '%b %d')
+                ORDER BY DATE(created_at) ASC
+            `;
+        }
+
+        const [trendRowsRaw] = await pool.query(trendQuery, [hotelId, ...dateFilterParams]);
+        
+        let revenueTrend = { labels: [], values: [] };
+        
+        if (range === '7d' || range === '30d') {
+            // Fill missing days
+            const numDays = range === '7d' ? 7 : 30;
+            const dataMap = new Map();
+            trendRowsRaw.forEach(r => dataMap.set(new Date(r.time_key).toISOString().split('T')[0], parseFloat(r.daily_revenue)));
+            
+            for (let i = numDays - 1; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                const isoDate = d.toISOString().split('T')[0];
+                const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                revenueTrend.labels.push(label);
+                revenueTrend.values.push(dataMap.get(isoDate) || 0);
+            }
+        } else if (range === 'today') {
+            // Fill missing hours
+            const currentHour = new Date().getHours();
+            const dataMap = new Map();
+            trendRowsRaw.forEach(r => dataMap.set(parseInt(r.time_key), parseFloat(r.daily_revenue)));
+            
+            for (let i = 0; i <= currentHour; i++) {
+                const d = new Date();
+                d.setHours(i);
+                const label = d.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
+                revenueTrend.labels.push(label);
+                revenueTrend.values.push(dataMap.get(i) || 0);
+            }
+            if (revenueTrend.labels.length === 0) {
+                revenueTrend = { labels: ['No Data'], values: [0] };
+            }
+        } else if (range === 'all') {
+            // Just use what's returned for months
+            revenueTrend.labels = trendRowsRaw.map(r => r.display_label);
+            revenueTrend.values = trendRowsRaw.map(r => parseFloat(r.daily_revenue));
+            if (revenueTrend.labels.length === 0) {
+                revenueTrend = { labels: ['No Data'], values: [0] };
+            }
+        }
 
         // Occupancy by room type (real-time for active stays today)
         const [occRows] = await pool.query(`
@@ -317,11 +588,6 @@ router.get('/reports/stats', async (req, res) => {
             GROUP BY r.id, r.name, r.total_rooms
         `, [hotelId]);
 
-        const revenueTrend = {
-            labels: revTrendRows.map(r => r.day_name),
-            values: revTrendRows.map(r => parseFloat(r.daily_revenue) || 0)
-        };
-
         const occupancyByRoomType = {
             labels: occRows.map(r => r.name),
             values: occRows.map(r => r.total_rooms > 0 ? Math.round((r.active_bookings / r.total_rooms) * 100) : 0)
@@ -336,6 +602,50 @@ router.get('/reports/stats', async (req, res) => {
             revenueTrend,
             occupancyByRoomType
         });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/reports/stat-details', async (req, res) => {
+    try {
+        const hotelId = req.user.hotel_id;
+        const metric = req.query.metric;
+        const range = req.query.range || '7d';
+
+        let dateFilter = '';
+        let dateFilterParams = [];
+
+        if (range === 'today') {
+            dateFilter = 'AND DATE(b.created_at) = CURDATE()';
+        } else if (range === '7d') {
+            dateFilter = 'AND b.created_at >= CURDATE() - INTERVAL 6 DAY';
+        } else if (range === '30d') {
+            dateFilter = 'AND b.created_at >= CURDATE() - INTERVAL 29 DAY';
+        }
+
+        let query = `
+            SELECT b.*, rt.name as room_type_name 
+            FROM bookings b
+            LEFT JOIN room_types rt ON b.room_type_id = rt.id
+            WHERE b.hotel_id = ? 
+        `;
+        let params = [hotelId, ...dateFilterParams];
+
+        if (metric === 'revenue') {
+            query += ` AND b.booking_status != 'cancelled' AND b.payment_status IN ('paid', 'partial') ${dateFilter} ORDER BY b.created_at DESC`;
+        } else if (metric === 'bookings') {
+            query += ` AND b.booking_status != 'cancelled' ${dateFilter} ORDER BY b.created_at DESC`;
+        } else if (metric === 'arrivals') {
+            query += ` AND b.booking_status = 'checked_in' AND b.check_in_date = CURDATE() ORDER BY b.created_at DESC`;
+        } else if (metric === 'departures') {
+            query += ` AND b.booking_status = 'checked_out' AND b.check_out_date = CURDATE() ORDER BY b.created_at DESC`;
+        } else {
+            return res.status(400).json({ error: 'Invalid metric' });
+        }
+
+        const [bookings] = await pool.query(query, params);
+        res.json(bookings);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -427,12 +737,79 @@ router.delete('/offers/:id', async (req, res) => {
     }
 });
 
+// --- PROMO CODES CRUD ---
+
+router.get('/promo-codes', async (req, res) => {
+    try {
+        const [promoCodes] = await pool.query(
+            'SELECT * FROM promo_codes WHERE hotel_id = ? ORDER BY id DESC',
+            [req.user.hotel_id]
+        );
+        res.json(promoCodes);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/promo-codes', async (req, res) => {
+    try {
+        const { code, discount_type, discount_value, valid_from, valid_to, max_uses, is_active } = req.body;
+        const [result] = await pool.query(
+            `INSERT INTO promo_codes (hotel_id, code, discount_type, discount_value, valid_from, valid_to, max_uses, is_active)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [req.user.hotel_id, code, discount_type, discount_value, valid_from, valid_to, max_uses || null, is_active === undefined ? true : is_active]
+        );
+        res.json({ id: result.insertId, message: 'Promo code created' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.put('/promo-codes/:id', async (req, res) => {
+    try {
+        const { code, discount_type, discount_value, valid_from, valid_to, max_uses, is_active } = req.body;
+        await pool.query(
+            `UPDATE promo_codes SET code=?, discount_type=?, discount_value=?, valid_from=?, valid_to=?, max_uses=?, is_active=?
+             WHERE id=? AND hotel_id=?`,
+            [code, discount_type, discount_value, valid_from, valid_to, max_uses || null, is_active, req.params.id, req.user.hotel_id]
+        );
+        res.json({ message: 'Promo code updated' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.patch('/promo-codes/:id/toggle', async (req, res) => {
+    try {
+        await pool.query(
+            'UPDATE promo_codes SET is_active = NOT is_active WHERE id = ? AND hotel_id = ?',
+            [req.params.id, req.user.hotel_id]
+        );
+        res.json({ message: 'Promo code toggled' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.delete('/promo-codes/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM promo_codes WHERE id = ? AND hotel_id = ?', [req.params.id, req.user.hotel_id]);
+        res.json({ message: 'Promo code deleted' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- HOTEL SETTINGS ---
 
 router.get('/hotel-settings', async (req, res) => {
     try {
+        // Super admins don't belong to a hotel — return a platform placeholder
+        if (req.user.role === 'super_admin') {
+            return res.json({ name: 'Platform Admin', branding_logo_url: null, branding_primary_color: '#6366f1' });
+        }
         const [rows] = await pool.query(
-            'SELECT name, slug, address, contact_email, contact_phone, branding_logo_url, branding_primary_color, timezone FROM hotels WHERE id = ?',
+            'SELECT name, uuid, slug, address, contact_email, contact_phone, branding_logo_url, branding_primary_color, timezone, tax_rate, razorpay_key_id, razorpay_key_secret FROM hotels WHERE id = ?',
             [req.user.hotel_id]
         );
         if (rows.length === 0) return res.status(404).json({ error: 'Hotel not found' });
@@ -444,7 +821,7 @@ router.get('/hotel-settings', async (req, res) => {
 
 router.put('/hotel-settings', async (req, res) => {
     try {
-        const { name, address, contact_email, contact_phone, branding_logo_url, branding_primary_color, timezone } = req.body;
+        const { name, address, contact_email, contact_phone, branding_logo_url, branding_primary_color, timezone, tax_rate, razorpay_key_id, razorpay_key_secret } = req.body;
         await pool.query(
             `UPDATE hotels SET
                 name = COALESCE(?, name),
@@ -453,9 +830,12 @@ router.put('/hotel-settings', async (req, res) => {
                 contact_phone = COALESCE(?, contact_phone),
                 branding_logo_url = COALESCE(?, branding_logo_url),
                 branding_primary_color = COALESCE(?, branding_primary_color),
-                timezone = COALESCE(?, timezone)
+                timezone = COALESCE(?, timezone),
+                tax_rate = COALESCE(?, tax_rate),
+                razorpay_key_id = COALESCE(?, razorpay_key_id),
+                razorpay_key_secret = COALESCE(?, razorpay_key_secret)
              WHERE id = ?`,
-            [name, address, contact_email, contact_phone, branding_logo_url, branding_primary_color, timezone, req.user.hotel_id]
+            [name, address, contact_email, contact_phone, branding_logo_url, branding_primary_color, timezone, tax_rate ?? null, razorpay_key_id ?? null, razorpay_key_secret ?? null, req.user.hotel_id]
         );
         res.json({ message: 'Hotel settings updated successfully' });
     } catch (err) {

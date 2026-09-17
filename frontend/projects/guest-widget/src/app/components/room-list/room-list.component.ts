@@ -1,16 +1,16 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 
 @Component({
   selector: 'app-room-list',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterModule],
   templateUrl: './room-list.component.html'
 })
 export class RoomListComponent implements OnInit {
-  hotelSlug = 'grand-oasis';
+  hotelSlug = '';
   rooms: any[] = [];
   checkIn: string = '';
   checkOut: string = '';
@@ -28,7 +28,10 @@ export class RoomListComponent implements OnInit {
       this.checkIn = params['checkIn'];
       this.checkOut = params['checkOut'];
       this.guests = params['guests'] ? parseInt(params['guests'], 10) : 2;
-      this.fetchAvailability();
+      this.hotelSlug = params['hotel'] || '';
+      if (this.hotelSlug) {
+        this.fetchAvailability();
+      }
     });
   }
 
@@ -56,7 +59,20 @@ export class RoomListComponent implements OnInit {
         checkIn: this.checkIn,
         checkOut: this.checkOut,
         guests: this.guests
-      }
+      },
+      queryParamsHandling: 'merge'
     });
+  }
+
+  // Returns extra beds needed for this room given the selected guest count
+  extraBedsFor(room: any): number {
+    const defaultCap = room.default_capacity || room.max_occupancy || 2;
+    return Math.max(0, this.guests - defaultCap);
+  }
+
+  // Returns total price per night including extra bed charges
+  pricePerNightFor(room: any): number {
+    const extraBeds = this.extraBedsFor(room);
+    return parseFloat(room.base_price) + (extraBeds * parseFloat(room.extra_bed_price || 0));
   }
 }
