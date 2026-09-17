@@ -2,51 +2,68 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AdminApiService } from '../../services/admin-api.service';
+import { GuestDetailsModalComponent } from '../guest-details-modal/guest-details-modal.component';
 
 @Component({
   selector: 'app-reservations',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, GuestDetailsModalComponent],
   templateUrl: './reservations.component.html'
 })
 export class ReservationsComponent implements OnInit {
   bookings: any[] = [];
   searchTerm: string = '';
   isLoading = true;
+  currentPage = 1;
+  pageSize = 10;
+  totalBookings = 0;
+  totalPages = 0;
+  
   // Tracks the entered received amount per booking id
   partialAmounts: { [bookingId: number]: number } = {};
+  
+  // Debounce timer for search
+  private searchTimeout: any;
 
-  // Guest details modal state
-  selectedGuestBooking: any = null;
+  // Guest Details Modal
   isGuestModalOpen = false;
-  isUploadingDoc = false;
-  uploadDocError = '';
+  selectedGuestBooking: any = null;
+
+  // History Modal State
+  isHistoryModalOpen = false;
+  selectedBookingHistory: any[] = [];
+  isHistoryLoading = false;
+  activeHistoryTab: 'booking' | 'payment' = 'booking';
 
   constructor(private api: AdminApiService) {}
+
+  get filteredBookingHistory(): any[] {
+    return this.selectedBookingHistory.filter(h => h.status_type === this.activeHistoryTab);
+  }
 
   ngOnInit(): void {
     this.loadBookings();
   }
 
-  get filteredBookings(): any[] {
-    if (!this.searchTerm.trim()) {
-      return this.bookings;
+  onSearchChange(): void {
+    if (this.searchTimeout) {
+      clearTimeout(this.searchTimeout);
     }
-    const term = this.searchTerm.toLowerCase();
-    return this.bookings.filter(b => 
-      (b.guest_name && b.guest_name.toLowerCase().includes(term)) ||
-      (b.id && `bkg-${b.id}`.includes(term)) || 
-      (b.id && b.id.toString().includes(term))
-    );
+    this.searchTimeout = setTimeout(() => {
+      this.currentPage = 1;
+      this.loadBookings();
+    }, 300);
   }
 
   loadBookings(): void {
     this.isLoading = true;
-    this.api.getBookings().subscribe({
-      next: (data) => {
-        this.bookings = data;
+    this.api.getBookings(this.currentPage, this.pageSize, this.searchTerm).subscribe({
+      next: (res) => {
+        this.bookings = res.data;
+        this.totalBookings = res.total;
+        this.totalPages = res.totalPages;
         // Pre-populate partialAmounts from existing amount_paid values
-        data.forEach((b: any) => {
+        res.data.forEach((b: any) => {
           if (b.amount_paid != null) this.partialAmounts[b.id] = b.amount_paid;
         });
         this.isLoading = false;
@@ -54,12 +71,23 @@ export class ReservationsComponent implements OnInit {
       error: (err) => {
         console.error('Failed to load bookings', err);
         this.isLoading = false;
-        this.bookings = [
-          { id: 1, guest_name: 'John Doe', check_in_date: '2026-09-10', check_out_date: '2026-09-15', booking_status: 'confirmed', payment_status: 'paid', total_amount: 550 },
-          { id: 2, guest_name: 'Jane Smith', check_in_date: '2026-09-12', check_out_date: '2026-09-14', booking_status: 'pending', payment_status: 'unpaid', total_amount: 220 }
-        ];
+        this.bookings = [];
       }
     });
+  }
+
+  nextPage(): void {
+    if (this.currentPage < this.totalPages) {
+      this.currentPage++;
+      this.loadBookings();
+    }
+  }
+
+  previousPage(): void {
+    if (this.currentPage > 1) {
+      this.currentPage--;
+      this.loadBookings();
+    }
   }
 
   updateStatus(booking: any, newStatus: string): void {
@@ -94,7 +122,6 @@ export class ReservationsComponent implements OnInit {
   openGuestModal(booking: any): void {
     this.selectedGuestBooking = booking;
     this.isGuestModalOpen = true;
-    this.uploadDocError = '';
   }
 
   closeGuestModal(): void {
@@ -102,26 +129,28 @@ export class ReservationsComponent implements OnInit {
     this.selectedGuestBooking = null;
   }
 
-  onDocumentSelected(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (input.files && input.files[0]) {
-      const file = input.files[0];
-      if (file.size > 10 * 1024 * 1024) {
-        this.uploadDocError = 'File is too large. Maximum size is 10 MB.';
-        return;
+  // Document upload logic moved to GuestDetailsModalComponent
+
+  // --- HISTORY LOGIC ---
+  openHistoryModal(booking: any): void {
+    this.isHistoryModalOpen = true;
+    this.isHistoryLoading = true;
+    this.selectedBookingHistory = [];
+    
+    this.api.getBookingHistory(booking.id).subscribe({
+      next: (data) => {
+        this.selectedBookingHistory = data;
+        this.isHistoryLoading = false;
+      },
+      error: (err) => {
+        console.error('Failed to load history', err);
+        this.isHistoryLoading = false;
       }
-      this.isUploadingDoc = true;
-      this.uploadDocError = '';
-      this.api.uploadGuestDocument(this.selectedGuestBooking.id, file).subscribe({
-        next: (res) => {
-          this.selectedGuestBooking.guest_document_url = res.url;
-          this.isUploadingDoc = false;
-        },
-        error: () => {
-          this.isUploadingDoc = false;
-          this.uploadDocError = 'Upload failed. Please try again.';
-        }
-      });
-    }
+    });
+  }
+
+  closeHistoryModal(): void {
+    this.isHistoryModalOpen = false;
+    this.selectedBookingHistory = [];
   }
 }

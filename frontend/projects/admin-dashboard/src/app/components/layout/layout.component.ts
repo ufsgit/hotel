@@ -109,7 +109,7 @@ export class LayoutComponent implements OnInit {
     const currentUrl = this.router.url.split('?')[0];
     const path = currentUrl.split('/')[1] || ''; 
 
-    const protectedPages = ['dashboard', 'calendar', 'reservations', 'rooms', 'offers', 'settings', 'staff'];
+    const protectedPages = ['dashboard', 'calendar', 'reservations', 'rooms', 'offers', 'settings', 'staff', 'reports'];
     
     if (path === 'no-access') {
        const firstAllowed = protectedPages.find(p => p !== 'staff' && this.hasPermission(p));

@@ -46,6 +46,10 @@
           <i class="material-icons text-xl" [ngClass]="{'mr-3': !isSidebarCollapsed}">list_alt</i>
           <span *ngIf="!isSidebarCollapsed" class="whitespace-nowrap animate-fade-in">Reservations</span>
         </a>
+        <a *ngIf="hasPermission('reservations')" routerLink="/active-guests" routerLinkActive="active-link" class="sidebar-link flex items-center px-3 py-3 rounded-xl text-sm transition-all group" [ngClass]="{'justify-center': isSidebarCollapsed}">
+          <i class="material-icons text-xl" [ngClass]="{'mr-3': !isSidebarCollapsed}">room_service</i>
+          <span *ngIf="!isSidebarCollapsed" class="whitespace-nowrap animate-fade-in">Active Guests</span>
+        </a>
         <a *ngIf="hasPermission('rooms')" routerLink="/rooms" routerLinkActive="active-link" class="sidebar-link flex items-center px-3 py-3 rounded-xl text-sm transition-all group" [ngClass]="{'justify-center': isSidebarCollapsed}">
           <i class="material-icons text-xl" [ngClass]="{'mr-3': !isSidebarCollapsed}">king_bed</i>
           <span *ngIf="!isSidebarCollapsed" class="whitespace-nowrap animate-fade-in">Rooms</span>
@@ -57,6 +61,10 @@
         <a *ngIf="userRole === 'owner'" routerLink="/staff" routerLinkActive="active-link" class="sidebar-link flex items-center px-3 py-3 rounded-xl text-sm transition-all group" [ngClass]="{'justify-center': isSidebarCollapsed}">
           <i class="material-icons text-xl" [ngClass]="{'mr-3': !isSidebarCollapsed}">people</i>
           <span *ngIf="!isSidebarCollapsed" class="whitespace-nowrap animate-fade-in">Staff</span>
+        </a>
+        <a *ngIf="hasPermission('reports')" routerLink="/reports" routerLinkActive="active-link" class="sidebar-link flex items-center px-3 py-3 rounded-xl text-sm transition-all group" [ngClass]="{'justify-center': isSidebarCollapsed}">
+          <i class="material-icons text-xl" [ngClass]="{'mr-3': !isSidebarCollapsed}">bar_chart</i>
+          <span *ngIf="!isSidebarCollapsed" class="whitespace-nowrap animate-fade-in">Reports</span>
         </a>
 
         <!-- Divider -->

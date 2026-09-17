@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 @Injectable({
@@ -24,12 +24,35 @@ export class AdminApiService {
     return this.http.get<any[]>(`${this.baseUrl}/my-hotels`, { headers: this.getHeaders() });
   }
 
-  getBookings(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.baseUrl}/bookings`, { headers: this.getHeaders() });
+  getBookings(page: number = 1, limit: number = 10, search: string = '', status: string = ''): Observable<any> {
+    let params = new HttpParams().set('page', page).set('limit', limit);
+    if (search) params = params.set('search', search);
+    if (status) params = params.set('status', status);
+    return this.http.get<any>(`${this.baseUrl}/bookings`, { headers: this.getHeaders(), params });
   }
 
   updateBookingStatus(id: number, statusData: any): Observable<any> {
     return this.http.put(`${this.baseUrl}/bookings/${id}/status`, statusData, { headers: this.getHeaders() });
+  }
+
+  getBookingHistory(id: number): Observable<any> {
+    return this.http.get(`${this.baseUrl}/bookings/${id}/history`, { headers: this.getHeaders() });
+  }
+
+  // --- BOOKING EXPENSES ---
+  getBookingExpenses(id: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/bookings/${id}/expenses`, { headers: this.getHeaders() });
+  }
+
+  addBookingExpense(id: number, data: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/bookings/${id}/expenses`, data, { headers: this.getHeaders() });
+  }
+
+  updateBookingExpenseStatus(bookingId: number, expenseId: number, status: string, amountPaid?: number): Observable<any> {
+    return this.http.put(`${this.baseUrl}/bookings/${bookingId}/expenses/${expenseId}/status`, { 
+      payment_status: status,
+      amount_paid: amountPaid
+    }, { headers: this.getHeaders() });
   }
 
   uploadGuestDocument(bookingId: number, file: File): Observable<{ url: string }> {

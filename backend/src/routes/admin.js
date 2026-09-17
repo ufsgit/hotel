@@ -187,7 +187,8 @@ router.put('/staff/:id', async (req, res) => {
         if (req.user.role !== 'owner') return res.status(403).json({ error: 'Only owners can edit staff.' });
         
         const targetUserId = parseInt(req.params.id);
-        const { name, email, role, password, permissions } = req.body;
+        const { name, email, role, password, permissions, target_hotel_id } = req.body;
+        console.log('PUT /staff/:id payload:', req.body);
         
         // Ensure the target user actually belongs to this hotel
         const [rows] = await pool.query('SELECT * FROM user_hotels WHERE user_id = ? AND hotel_id = ?', [targetUserId, req.user.hotel_id]);
@@ -207,8 +208,8 @@ router.put('/staff/:id', async (req, res) => {
             await pool.query(query, params);
         }
         
-        // Update their role and permissions for this hotel
-        if (role || permissions !== undefined) {
+        // Update their role, permissions, and hotel assignment
+        if (role || permissions !== undefined || target_hotel_id) {
             // Prevent changing own role if they are the last owner, but for now just prevent changing own role entirely
             if (targetUserId === req.user.id && role && role !== 'owner') {
                 return res.status(400).json({ error: 'You cannot downgrade your own role.' });
@@ -228,10 +229,27 @@ router.put('/staff/:id', async (req, res) => {
                 uhParams.push(permissions ? JSON.stringify(permissions) : null);
             }
             
+            if (target_hotel_id && parseInt(target_hotel_id) !== req.user.hotel_id) {
+                // Ensure the owner actually owns the target property
+                const [targetCheck] = await pool.query('SELECT role FROM user_hotels WHERE user_id = ? AND hotel_id = ?', [req.user.id, target_hotel_id]);
+                if (targetCheck.length === 0 || targetCheck[0].role !== 'owner') {
+                    return res.status(403).json({ error: 'You do not have owner access to the target property.' });
+                }
+                uhSet.push('hotel_id = ?');
+                uhParams.push(target_hotel_id);
+            }
+            
             if (uhSet.length > 0) {
                 uhQuery += uhSet.join(', ') + ' WHERE user_id = ? AND hotel_id = ?';
                 uhParams.push(targetUserId, req.user.hotel_id);
-                await pool.query(uhQuery, uhParams);
+                try {
+                    await pool.query(uhQuery, uhParams);
+                } catch (e) {
+                    if (e.code === 'ER_DUP_ENTRY') {
+                        return res.status(400).json({ error: 'This user is already assigned to the target property.' });
+                    }
+                    throw e;
+                }
             }
         }
 
@@ -273,14 +291,47 @@ router.get('/room-types', async (req, res) => {
 
 router.get('/bookings', async (req, res) => {
     try {
-        const [bookings] = await pool.query(`
-            SELECT b.*, rt.name as room_type_name 
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const offset = (page - 1) * limit;
+        const search = req.query.search || '';
+        const status = req.query.status || '';
+
+        let baseQuery = `
             FROM bookings b 
             LEFT JOIN room_types rt ON b.room_type_id = rt.id 
-            WHERE b.hotel_id = ? 
+            WHERE b.hotel_id = ?
+        `;
+        const params = [req.user.hotel_id];
+
+        if (status) {
+            baseQuery += ` AND b.booking_status = ?`;
+            params.push(status);
+        }
+
+        if (search.trim()) {
+            baseQuery += ` AND (b.guest_name LIKE ? OR b.id = ?)`;
+            params.push(`%${search}%`, search.replace(/\D/g, '') || -1); // Extract numbers for ID search
+        }
+
+        const [countResult] = await pool.query(`SELECT COUNT(*) as total ${baseQuery}`, params);
+        const total = countResult[0].total;
+
+        const [bookings] = await pool.query(`
+            SELECT b.*, rt.name as room_type_name,
+            (SELECT COALESCE(SUM(amount), 0) FROM booking_expenses WHERE booking_id = b.id) as total_expenses,
+            (SELECT COALESCE(SUM(CASE WHEN payment_status = 'unpaid' THEN amount WHEN payment_status = 'partial' THEN amount - COALESCE(amount_paid, 0) ELSE 0 END), 0) FROM booking_expenses WHERE booking_id = b.id) as unpaid_expenses
+            ${baseQuery}
             ORDER BY b.created_at DESC
-        `, [req.user.hotel_id]);
-        res.json(bookings);
+            LIMIT ? OFFSET ?
+        `, [...params, limit, offset]);
+
+        res.json({
+            data: bookings,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit)
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -289,6 +340,12 @@ router.get('/bookings', async (req, res) => {
 router.put('/bookings/:id/status', async (req, res) => {
     try {
         const { booking_status, payment_status, amount_paid } = req.body;
+        const bookingId = req.params.id;
+
+        // Get old status
+        const [oldRows] = await pool.query('SELECT booking_status, payment_status FROM bookings WHERE id = ? AND hotel_id = ?', [bookingId, req.user.hotel_id]);
+        if (oldRows.length === 0) return res.status(404).json({ error: 'Booking not found' });
+        const oldData = oldRows[0];
 
         // Build dynamic SET clause
         const fields = [];
@@ -298,11 +355,25 @@ router.put('/bookings/:id/status', async (req, res) => {
         if (amount_paid !== undefined)    { fields.push('amount_paid = ?');    values.push(amount_paid); }
 
         if (fields.length > 0) {
-            values.push(req.params.id, req.user.hotel_id);
+            values.push(bookingId, req.user.hotel_id);
             await pool.query(
                 `UPDATE bookings SET ${fields.join(', ')} WHERE id = ? AND hotel_id = ?`,
                 values
             );
+            
+            // Insert history logs
+            if (booking_status !== undefined && booking_status !== oldData.booking_status) {
+                await pool.query(
+                    'INSERT INTO booking_history (booking_id, changed_by, status_type, old_status, new_status) VALUES (?, ?, ?, ?, ?)',
+                    [bookingId, req.user.id, 'booking', oldData.booking_status, booking_status]
+                );
+            }
+            if (payment_status !== undefined && payment_status !== oldData.payment_status) {
+                await pool.query(
+                    'INSERT INTO booking_history (booking_id, changed_by, status_type, old_status, new_status) VALUES (?, ?, ?, ?, ?)',
+                    [bookingId, req.user.id, 'payment', oldData.payment_status, payment_status]
+                );
+            }
         }
 
         if (booking_status === 'cancelled') {
@@ -314,6 +385,58 @@ router.put('/bookings/:id/status', async (req, res) => {
         }
 
         res.json({ message: 'Booking status updated' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/bookings/:id/history', async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT h.*, u.name as changed_by_name
+            FROM booking_history h
+            LEFT JOIN users u ON h.changed_by = u.id
+            JOIN bookings b ON h.booking_id = b.id
+            WHERE h.booking_id = ? AND b.hotel_id = ?
+            ORDER BY h.changed_at DESC
+        `, [req.params.id, req.user.hotel_id]);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- BOOKING EXPENSES ---
+router.get('/bookings/:id/expenses', async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM booking_expenses WHERE booking_id = ? AND hotel_id = ? ORDER BY created_at DESC', [req.params.id, req.user.hotel_id]);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/bookings/:id/expenses', async (req, res) => {
+    try {
+        const { expense_type, amount, description } = req.body;
+        await pool.query(
+            'INSERT INTO booking_expenses (booking_id, hotel_id, expense_type, amount, description) VALUES (?, ?, ?, ?, ?)',
+            [req.params.id, req.user.hotel_id, expense_type, amount, description]
+        );
+        res.json({ message: 'Expense added successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.put('/bookings/:id/expenses/:expenseId/status', async (req, res) => {
+    try {
+        const { payment_status, amount_paid } = req.body;
+        await pool.query(
+            'UPDATE booking_expenses SET payment_status = ?, amount_paid = ? WHERE id = ? AND booking_id = ? AND hotel_id = ?',
+            [payment_status, amount_paid || 0, req.params.expenseId, req.params.id, req.user.hotel_id]
+        );
+        res.json({ message: 'Expense status updated' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -480,6 +603,21 @@ router.get('/reports/stats', async (req, res) => {
             `SELECT COALESCE(SUM(total_amount), 0) as expected_revenue FROM bookings WHERE hotel_id = ? AND booking_status != 'cancelled' ${dateFilter}`,
             [hotelId, ...dateFilterParams]
         );
+
+        // Expenses Revenue
+        const [expRow] = await pool.query(
+            `SELECT COALESCE(SUM(CASE 
+                WHEN payment_status = 'paid' THEN amount 
+                WHEN payment_status = 'partial' THEN COALESCE(amount_paid, 0)
+                ELSE 0 
+            END), 0) as expenses_revenue FROM booking_expenses WHERE hotel_id = ? ${dateFilter}`,
+            [hotelId, ...dateFilterParams]
+        );
+
+        const [expectedExpRow] = await pool.query(
+            `SELECT COALESCE(SUM(amount), 0) as expected_expenses_revenue FROM booking_expenses WHERE hotel_id = ? ${dateFilter}`,
+            [hotelId, ...dateFilterParams]
+        );
         
         // Total bookings
         const [bkRow] = await pool.query(`SELECT COUNT(*) as total_bookings FROM bookings WHERE hotel_id = ? ${dateFilter}`, [hotelId, ...dateFilterParams]);
@@ -593,14 +731,62 @@ router.get('/reports/stats', async (req, res) => {
             values: occRows.map(r => r.total_rooms > 0 ? Math.round((r.active_bookings / r.total_rooms) * 100) : 0)
         };
 
+        // Expenses Distribution
+        const [expDistRows] = await pool.query(`
+            SELECT expense_type, COALESCE(SUM(amount), 0) as total
+            FROM booking_expenses
+            WHERE hotel_id = ? ${dateFilter}
+            GROUP BY expense_type
+        `, [hotelId, ...dateFilterParams]);
+
+        const expenseDistribution = {
+            labels: expDistRows.map(r => r.expense_type),
+            values: expDistRows.map(r => parseFloat(r.total))
+        };
+
+        // Advanced Metrics
+        const [advancedRows] = await pool.query(`
+            SELECT 
+                COUNT(CASE WHEN booking_status = 'cancelled' THEN 1 END) as cancelled_bookings,
+                COALESCE(AVG(DATEDIFF(check_out_date, check_in_date)), 0) as alos,
+                COALESCE(SUM(total_amount) / NULLIF(SUM(DATEDIFF(check_out_date, check_in_date)), 0), 0) as adr
+            FROM bookings 
+            WHERE hotel_id = ? ${dateFilter}
+        `, [hotelId, ...dateFilterParams]);
+
+        // Room Type Profitability
+        const [profRows] = await pool.query(`
+            SELECT 
+                r.name,
+                COALESCE(SUM(b.total_amount), 0) as revenue
+            FROM room_types r
+            LEFT JOIN bookings b ON b.room_type_id = r.id AND b.hotel_id = r.hotel_id AND b.booking_status != 'cancelled' ${dateFilter.replace('created_at', 'b.created_at')}
+            WHERE r.hotel_id = ?
+            GROUP BY r.id, r.name
+        `, [hotelId, ...dateFilterParams, hotelId]);
+        
+        const roomTypeProfitability = {
+            labels: profRows.map(r => r.name),
+            values: profRows.map(r => parseFloat(r.revenue))
+        };
+
         res.json({
-            revenue: parseFloat(revRow[0].revenue) || 0,
-            expectedRevenue: parseFloat(expectedRevRow[0].expected_revenue) || 0,
+            revenue: (parseFloat(revRow[0].revenue) || 0) + (parseFloat(expRow[0].expenses_revenue) || 0),
+            roomRevenue: parseFloat(revRow[0].revenue) || 0,
+            expensesRevenue: parseFloat(expRow[0].expenses_revenue) || 0,
+            expectedRevenue: (parseFloat(expectedRevRow[0].expected_revenue) || 0) + (parseFloat(expectedExpRow[0].expected_expenses_revenue) || 0),
+            expectedRoomRevenue: parseFloat(expectedRevRow[0].expected_revenue) || 0,
+            expectedExpensesRevenue: parseFloat(expectedExpRow[0].expected_expenses_revenue) || 0,
             totalBookings: bkRow[0].total_bookings || 0,
             arrivalsToday: arrRow[0].arrivals || 0,
             departuresToday: depRow[0].departures || 0,
+            cancelledBookings: advancedRows[0].cancelled_bookings || 0,
+            alos: parseFloat(advancedRows[0].alos).toFixed(1) || 0,
+            adr: parseFloat(advancedRows[0].adr).toFixed(2) || 0,
             revenueTrend,
-            occupancyByRoomType
+            occupancyByRoomType,
+            expenseDistribution,
+            roomTypeProfitability
         });
     } catch (err) {
         res.status(500).json({ error: err.message });

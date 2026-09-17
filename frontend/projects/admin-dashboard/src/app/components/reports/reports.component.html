@@ -1,0 +1,154 @@
+<div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
+    <p class="text-gray-600 mt-1">Overview of your hotel's performance</p>
+  </div>
+  
+  <div class="flex items-center gap-2">
+    <label class="text-sm font-medium text-gray-500">Time Range:</label>
+    <select [(ngModel)]="selectedRange" (change)="loadStats()" class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2 outline-none shadow-sm cursor-pointer">
+      <option value="today">Today</option>
+      <option value="7d">Last 7 Days</option>
+      <option value="30d">Last 30 Days</option>
+      <option value="all">All Time</option>
+    </select>
+  </div>
+</div>
+
+<div *ngIf="isLoading" class="flex items-center justify-center py-20">
+  <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+</div>
+
+<div *ngIf="!isLoading && stats" class="space-y-6 animate-fade-in">
+  
+  <!-- Top level stats -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <!-- Total Revenue -->
+    <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-center justify-between animate-slide-up delay-100">
+      <div>
+        <p class="text-sm font-medium text-gray-500">Collected Revenue</p>
+        <p class="text-2xl font-bold text-gray-900 mt-1">₹{{ stats.revenue }}</p>
+        <p class="text-xs text-gray-400 mt-1">Expected: ₹{{ stats.expectedRevenue }}</p>
+      </div>
+      <div class="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+        <i class="material-icons">payments</i>
+      </div>
+    </div>
+    
+    <!-- Total Bookings -->
+    <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-center justify-between animate-slide-up delay-100">
+      <div>
+        <p class="text-sm font-medium text-gray-500">Bookings</p>
+        <p class="text-2xl font-bold text-gray-900 mt-1">{{ stats.totalBookings }}</p>
+        <p class="text-xs text-gray-400 mt-1">In selected range</p>
+      </div>
+      <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+        <i class="material-icons">book_online</i>
+      </div>
+    </div>
+
+    <!-- ADR -->
+    <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-center justify-between animate-slide-up delay-100">
+      <div>
+        <p class="text-sm font-medium text-gray-500">Avg. Daily Rate</p>
+        <p class="text-2xl font-bold text-gray-900 mt-1">₹{{ stats.adr }}</p>
+        <p class="text-xs text-gray-400 mt-1">Per booked night</p>
+      </div>
+      <div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+        <i class="material-icons">hotel_class</i>
+      </div>
+    </div>
+
+    <!-- Cancellations & ALOS -->
+    <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex flex-col justify-center animate-slide-up delay-100">
+       <div class="flex items-center justify-between mb-3">
+         <div>
+            <p class="text-xs font-medium text-gray-500">Avg Length of Stay</p>
+            <p class="text-lg font-bold text-gray-900">{{ stats.alos }} nights</p>
+         </div>
+         <div class="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
+           <i class="material-icons text-sm">timelapse</i>
+         </div>
+       </div>
+       <div class="flex items-center justify-between pt-3 border-t border-gray-50">
+         <div>
+            <p class="text-xs font-medium text-gray-500">Cancellations</p>
+            <p class="text-lg font-bold text-gray-900">{{ stats.cancelledBookings }}</p>
+         </div>
+         <div class="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-600">
+           <i class="material-icons text-sm">event_busy</i>
+         </div>
+       </div>
+    </div>
+  </div>
+
+  <!-- Charts Row 1 -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Revenue Trend Chart -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm lg:col-span-2 animate-slide-up delay-200">
+      <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+        <i class="material-icons text-indigo-500 text-xl">show_chart</i> Revenue Trend
+      </h2>
+      <div class="h-72 w-full">
+        <canvas baseChart
+          [data]="revenueChartData"
+          [options]="revenueChartOptions"
+          [type]="revenueChartType">
+        </canvas>
+      </div>
+    </div>
+
+    <!-- Room Profitability Chart -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm animate-slide-up delay-200">
+      <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+        <i class="material-icons text-sky-500 text-xl">monetization_on</i> Room Profitability
+      </h2>
+      <div class="h-72 w-full">
+        <canvas baseChart
+          [data]="profChartData"
+          [options]="profChartOptions"
+          [type]="profChartType">
+        </canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Row 2 -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    
+    <!-- Financial Breakdown -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm animate-slide-up delay-300">
+      <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+        <i class="material-icons text-blue-500 text-xl">account_balance_wallet</i> Revenue Breakdown
+      </h2>
+      <div class="grid grid-cols-1 gap-4 h-72">
+        <div class="bg-gray-50 rounded-xl p-4 flex flex-col justify-center">
+           <div class="text-sm font-medium text-gray-500 mb-1">Room Revenue</div>
+           <div class="text-2xl font-bold text-gray-900 mb-1">₹{{ stats.roomRevenue }}</div>
+           <div class="text-xs text-gray-400">Expected: ₹{{ stats.expectedRoomRevenue }}</div>
+        </div>
+        <div class="bg-gray-50 rounded-xl p-4 flex flex-col justify-center">
+           <div class="text-sm font-medium text-gray-500 mb-1">Additional Expenses</div>
+           <div class="text-2xl font-bold text-gray-900 mb-1">₹{{ stats.expensesRevenue }}</div>
+           <div class="text-xs text-gray-400">Expected: ₹{{ stats.expectedExpensesRevenue }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Expenses Breakdown Pie Chart -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm animate-slide-up delay-300">
+      <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+        <i class="material-icons text-rose-500 text-xl">pie_chart</i> Expenses Breakdown
+      </h2>
+      <div class="h-72 w-full flex justify-center">
+        <canvas baseChart
+          [data]="expenseChartData"
+          [options]="expenseChartOptions"
+          [type]="expenseChartType">
+        </canvas>
+      </div>
+    </div>
+
+  </div>
+
+</div>
