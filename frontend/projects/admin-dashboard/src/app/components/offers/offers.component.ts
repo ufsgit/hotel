@@ -35,7 +35,8 @@ export class OffersComponent implements OnInit {
     start_date: '',
     end_date: '',
     is_active: true,
-    priority: 5
+    priority: 5,
+    is_rush_deal: false
   });
 
   emptyPromoForm = () => ({

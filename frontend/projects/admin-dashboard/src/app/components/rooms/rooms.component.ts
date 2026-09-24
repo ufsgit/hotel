@@ -34,8 +34,25 @@ export class RoomsComponent implements OnInit {
     extra_bed_allowed: false,
     extra_bed_price: 0,
     cover_image: '',
-    amenities: []
+    amenities: [],
+    room_size: '',
+    view_type: '',
+    bed_type: '',
+    detailed_amenities: {
+      popular: [],
+      features: [],
+      bathroom: [],
+      safety: [],
+      media: [],
+      early_checkin_policy: ''
+    },
+    rate_plans: []
   };
+
+  // Helper inputs for dynamic lists
+  customDetailedAmenityInput: any = { popular: '', features: '', bathroom: '', safety: '', media: '' };
+  newRatePlan = { id: '', name: '', badge: '', priceMultiplier: 1.0, packagePrice: 0, newInclusion: '', inclusions: [] as string[] };
+  editingRatePlanIndex: number | null = null;
 
   constructor(private api: AdminApiService) {}
 
@@ -96,8 +113,14 @@ export class RoomsComponent implements OnInit {
       extra_bed_allowed: false,
       extra_bed_price: 0,
       cover_image: '',
-      amenities: ['WiFi', 'TV', 'Air Conditioning']
+      amenities: ['WiFi', 'TV', 'Air Conditioning'],
+      room_size: '',
+      view_type: '',
+      bed_type: '',
+      detailed_amenities: { popular: [], features: [], bathroom: [], safety: [], media: [], early_checkin_policy: '' },
+      rate_plans: []
     };
+    this.resetNewRatePlan();
     this.showForm = true;
   }
 
@@ -125,11 +148,32 @@ export class RoomsComponent implements OnInit {
       }
     }
 
+    let detailedAmenities = { popular: [], features: [], bathroom: [], safety: [], media: [], early_checkin_policy: '' };
+    if (room.detailed_amenities) {
+      if (typeof room.detailed_amenities === 'string') {
+        try { detailedAmenities = JSON.parse(room.detailed_amenities) || detailedAmenities; } catch(e) {}
+      } else {
+        detailedAmenities = { ...detailedAmenities, ...room.detailed_amenities };
+      }
+    }
+
+    let ratePlans = [];
+    if (room.rate_plans) {
+      if (typeof room.rate_plans === 'string') {
+        try { ratePlans = JSON.parse(room.rate_plans) || []; } catch(e) {}
+      } else {
+        ratePlans = room.rate_plans || [];
+      }
+    }
+
     this.formData = { 
       ...room, 
       cover_image: cover,
-      amenities: [...roomAmenities]
+      amenities: [...roomAmenities],
+      detailed_amenities: detailedAmenities,
+      rate_plans: ratePlans
     };
+    this.resetNewRatePlan();
     this.showForm = true;
   }
 
@@ -230,6 +274,76 @@ export class RoomsComponent implements OnInit {
       this.api.deleteRoomType(id).subscribe(() => {
         this.loadRooms();
       });
+    }
+  }
+
+  amenityCategories = ['popular', 'features', 'bathroom', 'safety', 'media'];
+
+  // --- Detailed Amenities Methods ---
+  addDetailedAmenity(category: string): void {
+    const val = (this.customDetailedAmenityInput as any)[category].trim();
+    if (val && !(this.formData.detailed_amenities as any)[category].includes(val)) {
+      (this.formData.detailed_amenities as any)[category].push(val);
+    }
+    (this.customDetailedAmenityInput as any)[category] = '';
+  }
+
+  removeDetailedAmenity(category: string, idx: number): void {
+    (this.formData.detailed_amenities as any)[category].splice(idx, 1);
+  }
+
+  // --- Rate Plans Methods ---
+  resetNewRatePlan(): void {
+    this.newRatePlan = { id: '', name: '', badge: '', priceMultiplier: 1.0, packagePrice: this.formData.base_price || 0, newInclusion: '', inclusions: [] };
+    this.editingRatePlanIndex = null;
+  }
+
+  addRatePlanInclusion(): void {
+    const val = this.newRatePlan.newInclusion.trim();
+    if (val && !this.newRatePlan.inclusions.includes(val)) {
+      this.newRatePlan.inclusions.push(val);
+    }
+    this.newRatePlan.newInclusion = '';
+  }
+
+  removeRatePlanInclusion(idx: number): void {
+    this.newRatePlan.inclusions.splice(idx, 1);
+  }
+
+  addRatePlan(): void {
+    if (!this.newRatePlan.name || !this.newRatePlan.id) return;
+    const base = parseFloat(this.formData.base_price) || 1;
+    const pkg = parseFloat(String(this.newRatePlan.packagePrice)) || base;
+    const multiplier = Math.round((pkg / base) * 100) / 100;
+
+    const ratePlan = {
+      id: this.newRatePlan.id,
+      name: this.newRatePlan.name,
+      badge: this.newRatePlan.badge,
+      priceMultiplier: multiplier,
+      inclusions: [...this.newRatePlan.inclusions]
+    };
+
+    if (this.editingRatePlanIndex !== null) {
+      this.formData.rate_plans[this.editingRatePlanIndex] = ratePlan;
+    } else {
+      this.formData.rate_plans.push(ratePlan);
+    }
+    this.resetNewRatePlan();
+  }
+
+  editRatePlan(idx: number): void {
+    const plan = this.formData.rate_plans[idx];
+    const base = parseFloat(this.formData.base_price) || 1;
+    const packagePrice = Math.round(base * plan.priceMultiplier);
+    this.newRatePlan = { ...plan, packagePrice, newInclusion: '', inclusions: [...plan.inclusions] };
+    this.editingRatePlanIndex = idx;
+  }
+
+  removeRatePlan(idx: number): void {
+    this.formData.rate_plans.splice(idx, 1);
+    if (this.editingRatePlanIndex === idx) {
+      this.resetNewRatePlan();
     }
   }
 }

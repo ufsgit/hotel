@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, Location } from '@angular/common';
 import { RouterModule, Router, NavigationEnd } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { filter } from 'rxjs/operators';
@@ -21,7 +21,12 @@ export class LayoutComponent implements OnInit {
   activeHotelId: string | null = null;
   userPermissions: string[] = [];
 
-  constructor(private authService: AuthService, private api: AdminApiService, private router: Router) {
+  constructor(
+    private authService: AuthService,
+    private api: AdminApiService,
+    private router: Router,
+    private location: Location
+  ) {
     this.router.events.pipe(
       filter(event => event instanceof NavigationEnd)
     ).subscribe(() => {
@@ -31,20 +36,21 @@ export class LayoutComponent implements OnInit {
     });
   }
 
+  goBack(): void {
+    this.location.back();
+  }
+
   ngOnInit(): void {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        this.userRole = user.role || '';
-        this.userName = user.name || 'Admin';
-      } catch (_) {}
+    const user = this.authService.getUser();
+    if (user) {
+      this.userRole = user.role || '';
+      this.userName = user.name || 'Admin';
     }
 
-    // If super admin, they don't have an active property to select from.
+    // For impersonation tabs, activeHotelId comes from sessionStorage
+    this.activeHotelId = sessionStorage.getItem('impersonate_hotel_id') || localStorage.getItem('active_hotel_id');
+
     if (this.userRole !== 'super_admin') {
-      this.activeHotelId = localStorage.getItem('active_hotel_id');
-      
       this.api.getMyHotels().subscribe({
         next: (hotels) => {
           this.myHotels = hotels;
@@ -71,11 +77,8 @@ export class LayoutComponent implements OnInit {
         error: (err) => console.error('Failed to load my hotels', err)
       });
     } else {
-      // Super admin
-      this.api.getHotelSettings().subscribe({
-        next: (data) => { this.hotel = data; },
-        error: (err) => console.error('Failed to load hotel settings', err)
-      });
+      // Super admin — no hotel context needed, set static branding
+      this.hotel = { name: 'Platform Admin', branding_logo_url: null, branding_primary_color: '#6366f1' };
     }
   }
 
@@ -109,7 +112,7 @@ export class LayoutComponent implements OnInit {
     const currentUrl = this.router.url.split('?')[0];
     const path = currentUrl.split('/')[1] || ''; 
 
-    const protectedPages = ['dashboard', 'calendar', 'reservations', 'rooms', 'offers', 'settings', 'staff', 'reports'];
+    const protectedPages = ['dashboard', 'calendar', 'reservations', 'active-guests', 'rooms', 'offers', 'settings', 'staff', 'reports'];
     
     if (path === 'no-access') {
        const firstAllowed = protectedPages.find(p => p !== 'staff' && this.hasPermission(p));

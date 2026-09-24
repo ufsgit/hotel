@@ -1,43 +1,80 @@
-<div class="mb-8 flex justify-between items-center animate-slide-up delay-100">
-  <div>
+<!-- MakeMyTrip-style search bar -->
+<div class="mb-8 animate-slide-up delay-100">
+  <div class="flex items-center gap-2 mb-4">
     <h2 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-600 tracking-tight">Available Rooms</h2>
-    <p class="text-gray-500 mt-1">Select a room for your perfect stay.</p>
+    <p class="text-gray-400 mt-1 text-sm hidden sm:block">— Select a room for your perfect stay.</p>
   </div>
-  <div class="text-sm text-gray-600 glass px-5 py-2.5 rounded-full font-medium flex items-center shadow-sm">
-    <span class="mr-3"><i class="material-icons text-sm align-middle text-[var(--primary-color,theme(colors.blue.600))] mr-1">event</i> {{ checkIn | date:'MMM d' }} - {{ checkOut | date:'MMM d' }} ({{ guests }} Guests)</span>
-    <a routerLink="/" class="text-[var(--primary-color,theme(colors.blue.600))] hover:text-blue-700 font-semibold underline decoration-2 underline-offset-2 transition-colors">Change</a>
+
+  <!-- Search bar -->
+  <div class="bg-white rounded-2xl shadow-md border border-gray-200 flex flex-col md:flex-row overflow-hidden">
+    <!-- Check In -->
+    <div class="flex-1 flex flex-col px-5 py-3 border-b md:border-b-0 md:border-r border-gray-200 group cursor-pointer">
+      <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Check In</label>
+      <input type="date" [(ngModel)]="checkIn"
+        class="text-gray-900 font-semibold text-sm bg-transparent outline-none cursor-pointer w-full">
+    </div>
+    <!-- Check Out -->
+    <div class="flex-1 flex flex-col px-5 py-3 border-b md:border-b-0 md:border-r border-gray-200 cursor-pointer">
+      <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Check Out</label>
+      <input type="date" [(ngModel)]="checkOut"
+        class="text-gray-900 font-semibold text-sm bg-transparent outline-none cursor-pointer w-full">
+    </div>
+    <!-- Rooms & Guests -->
+    <div class="flex-1 flex flex-col px-5 py-3 border-b md:border-b-0 md:border-r border-gray-200">
+      <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Rooms & Guests</label>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-1.5">
+          <input type="number" [(ngModel)]="numRooms" min="1" max="20"
+            class="w-12 text-gray-900 font-bold text-sm bg-transparent outline-none text-center border-b-2 border-gray-300 focus:border-[var(--primary-color,theme(colors.blue.600))]">
+          <span class="text-gray-500 text-sm">Room{{ numRooms > 1 ? 's' : '' }},</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <input type="number" [(ngModel)]="guests" min="1" max="50"
+            class="w-12 text-gray-900 font-bold text-sm bg-transparent outline-none text-center border-b-2 border-gray-300 focus:border-[var(--primary-color,theme(colors.blue.600))]">
+          <span class="text-gray-500 text-sm">Adult{{ guests > 1 ? 's' : '' }}</span>
+        </div>
+      </div>
+    </div>
+    <!-- Search Button -->
+    <button (click)="searchAgain()"
+      class="bg-[var(--primary-color,theme(colors.blue.600))] hover:opacity-90 text-white font-bold px-10 py-4 md:py-0 text-sm uppercase tracking-widest flex items-center justify-center gap-2 transition-all">
+      <i class="material-icons text-[20px]">search</i>
+      <span class="hidden sm:inline">Search</span>
+    </button>
   </div>
 </div>
+
 
 <div *ngIf="isLoading" class="flex justify-center py-20 animate-fade-in">
   <div class="animate-spin rounded-full h-14 w-14 border-4 border-gray-200 border-t-[var(--primary-color,theme(colors.blue.600))] shadow-lg"></div>
 </div>
 
-<div *ngIf="!isLoading && rooms.length === 0" class="text-center py-16 glass rounded-2xl animate-slide-up delay-200">
+<div *ngIf="!isLoading && filteredRooms.length === 0" class="text-center py-16 glass rounded-2xl animate-slide-up delay-200">
   <div class="bg-gray-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
     <i class="material-icons text-4xl text-gray-400">search_off</i>
   </div>
   <p class="text-gray-600 text-xl font-medium mb-2">No rooms available</p>
-  <p class="text-gray-500 mb-6">Try adjusting your dates or guest count.</p>
+  <p class="text-gray-500 mb-6">No room type can accommodate {{ guests }} guest(s) in {{ numRooms }} room(s). Try increasing rooms or reducing guests.</p>
   <button routerLink="/" class="px-8 py-3 bg-white border border-[var(--primary-color,theme(colors.blue.600))] text-[var(--primary-color,theme(colors.blue.600))] font-semibold rounded-xl hover:bg-blue-50 transition-all shadow-sm">
     Change Search
   </button>
 </div>
 
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-12">
-  <div *ngFor="let room of rooms; let i = index" class="glass-card rounded-2xl overflow-hidden flex flex-col group animate-slide-up" [ngStyle]="{'animation-delay': (i+2)*100 + 'ms'}">
+  <div *ngFor="let room of filteredRooms; let i = index" class="glass-card rounded-2xl overflow-hidden flex flex-col group animate-slide-up" [ngStyle]="{'animation-delay': (i+2)*100 + 'ms'}">
     <!-- Image -->
-    <div class="h-56 bg-gray-200 relative overflow-hidden">
-      <img [src]="room.photos && room.photos.length ? room.photos[0] : 'https://via.placeholder.com/400x300?text=' + room.name" alt="{{room.name}}" class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700 ease-out">
+    <div class="h-56 bg-gray-200 relative overflow-hidden cursor-pointer" (click)="openRoomDetails(room)">
+      <img [src]="room.photos && room.photos.length ? room.photos[0] : 'https://placehold.co/400x300?text=' + room.name" alt="{{room.name}}" class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700 ease-out">
       <div class="absolute inset-0 bg-gradient-to-t from-gray-900/60 to-transparent opacity-60"></div>
       
-      <div *ngIf="room.min_available < 3" class="absolute top-4 left-4 bg-red-500/90 backdrop-blur text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg border border-red-400/50 flex items-center gap-1 animate-pulse">
-        <i class="material-icons text-[14px]">local_fire_department</i> Only {{room.min_available}} left!
+      <div *ngIf="room.min_available < 3" class="absolute top-4 left-4 bg-red-500/90 backdrop-blur text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg border border-red-400/50 flex items-center gap-1" [ngClass]="{'animate-pulse': room.min_available > 0}">
+        <i class="material-icons text-[14px]">{{ room.min_available <= 0 ? 'block' : 'local_fire_department' }}</i> 
+        {{ room.min_available <= 0 ? 'Sold Out!' : 'Only ' + room.min_available + ' left!' }}
       </div>
     </div>
     
     <!-- Content -->
-    <div class="p-6 flex-grow flex flex-col relative bg-white/40">
+    <div class="p-6 flex-grow flex flex-col relative bg-white/40 cursor-pointer" (click)="openRoomDetails(room)">
       <h3 class="text-2xl font-bold text-gray-900 mb-2 group-hover:text-[var(--primary-color,theme(colors.blue.600))] transition-colors">{{ room.name }}</h3>
       <p class="text-gray-600 text-sm mb-5 line-clamp-2 leading-relaxed">{{ room.description }}</p>
       
@@ -49,19 +86,204 @@
       <!-- Price & Action -->
       <div class="mt-auto pt-4 border-t border-gray-200/50 flex justify-between items-end">
         <div>
-          <p class="text-[10px] text-gray-500 uppercase tracking-widest font-semibold mb-1">Price per night</p>
+          <p class="text-[10px] text-gray-500 uppercase tracking-widest font-semibold mb-1">Total price per night ({{ numRooms }} Room{{ numRooms > 1 ? 's' : '' }})</p>
           <p class="text-3xl font-extrabold text-gray-900 flex items-start leading-none"><span class="text-lg mt-1 mr-1 text-[var(--primary-color,theme(colors.blue.600))]">₹</span>{{ pricePerNightFor(room) | number:'1.2-2' }}</p>
           <!-- Extra bed notice -->
           <div *ngIf="extraBedsFor(room) > 0" class="mt-1.5 flex items-center gap-1 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
             <i class="material-icons text-[13px] text-amber-500">hotel</i>
-            <span>Incl. {{ extraBedsFor(room) }} extra bed (₹{{ room.extra_bed_price }}/night)</span>
+            <span>Incl. {{ extraBedsFor(room) }} extra bed(s) total (₹{{ room.extra_bed_price }}/night each)</span>
           </div>
-          <p *ngIf="extraBedsFor(room) === 0" class="text-[11px] text-gray-400 mt-1">Base: ₹{{ room.base_price }}</p>
+          <p *ngIf="extraBedsFor(room) === 0" class="text-[11px] text-gray-400 mt-1">Base: ₹{{ room.base_price }} / room</p>
         </div>
-        <button (click)="bookRoom(room)" class="bg-gradient-to-r from-[var(--primary-color,theme(colors.slate.800))] to-slate-900 hover:from-slate-700 hover:to-slate-800 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg hover:shadow-slate-500/30 hover:-translate-y-0.5 active:translate-y-0">
-          Reserve
+        <button [disabled]="room.min_available <= 0" (click)="bookRoom(room)" 
+          class="font-bold py-3 px-8 rounded-xl transition-all text-white"
+          [ngClass]="room.min_available <= 0 ? 'bg-slate-400 cursor-not-allowed opacity-70' : 'bg-gradient-to-r from-[var(--primary-color,theme(colors.slate.800))] to-slate-900 hover:from-slate-700 hover:to-slate-800 shadow-lg hover:shadow-slate-500/30 hover:-translate-y-0.5 active:translate-y-0'">
+          {{ room.min_available <= 0 ? 'Sold Out' : 'Reserve' }}
         </button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Detailed Room Modal ──────────────────────────────────────────────── -->
+<div *ngIf="isDetailsModalOpen && selectedRoomDetails" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-8" (click)="closeRoomDetails()">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-full max-h-[90vh] flex flex-col overflow-hidden" (click)="$event.stopPropagation()">
+    
+    <!-- Modal Header -->
+    <div class="p-6 border-b border-gray-100 flex justify-between items-center shrink-0 bg-white z-10 sticky top-0 shadow-sm">
+      <h2 class="text-2xl font-bold text-gray-900">{{ selectedRoomDetails.name }}</h2>
+      <button (click)="closeRoomDetails()" class="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 transition-colors">
+        <i class="material-icons">close</i>
+      </button>
+    </div>
+
+    <!-- Modal Body (Scrollable) -->
+    <div class="flex-grow overflow-y-auto bg-gray-50">
+      
+      <!-- Top Section: Image & Quick Info -->
+      <div class="bg-white p-6 mb-4 flex flex-col md:flex-row gap-8 shadow-sm">
+        <div class="w-full md:w-1/2 relative rounded-xl overflow-hidden h-64 md:h-80">
+          <img [src]="selectedRoomDetails.photos && selectedRoomDetails.photos.length ? selectedRoomDetails.photos[0] : 'https://placehold.co/800x600?text=' + selectedRoomDetails.name" 
+               alt="{{ selectedRoomDetails.name }}" class="absolute inset-0 w-full h-full object-cover">
+        </div>
+        <div class="w-full md:w-1/2 flex flex-col justify-center">
+          <div class="flex flex-wrap gap-4 text-sm text-gray-600 mb-6">
+            <div *ngIf="selectedRoomDetails.room_size" class="flex items-center gap-1.5"><i class="material-icons text-gray-400">straighten</i> {{ selectedRoomDetails.room_size }}</div>
+            <div *ngIf="selectedRoomDetails.view_type" class="flex items-center gap-1.5"><i class="material-icons text-gray-400">location_city</i> {{ selectedRoomDetails.view_type }}</div>
+            <div class="flex items-center gap-1.5"><i class="material-icons text-gray-400">king_bed</i> {{ selectedRoomDetails.bed_type || 'Bedroom - 1 ' + (selectedRoomDetails.default_capacity > 2 ? 'King' : 'Queen') + ' Bed' }}</div>
+          </div>
+          <p class="text-gray-700 leading-relaxed mb-6">{{ selectedRoomDetails.description }}</p>
+          <div *ngIf="getDetailedAmenities(selectedRoomDetails)?.early_checkin_policy" class="bg-blue-50 text-blue-800 text-sm p-4 rounded-lg border border-blue-100 flex items-start gap-3">
+            <i class="material-icons text-blue-500 mt-0.5">info</i>
+            <div>
+              <p class="font-bold mb-1">Check-in / Check-out Policy</p>
+              <p class="text-blue-700/80">{{ getDetailedAmenities(selectedRoomDetails).early_checkin_policy }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Facilities & Amenities Section -->
+      <div class="bg-white p-6 md:p-8 mb-4 shadow-sm">
+        <h3 class="text-xl font-bold text-gray-900 mb-6">Room Amenities & Facilities</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" *ngIf="getDetailedAmenities(selectedRoomDetails) as amenities">
+          
+          <div *ngIf="amenities.popular?.length">
+            <h4 class="font-bold text-gray-800 mb-3 text-sm uppercase tracking-wider">Popular with Guests</h4>
+            <ul class="space-y-2 text-sm text-gray-600">
+              <li *ngFor="let item of amenities.popular" class="flex items-center gap-2"><i class="material-icons text-[16px] text-green-500">check</i> {{ item }}</li>
+            </ul>
+          </div>
+          
+          <div *ngIf="amenities.features?.length">
+            <h4 class="font-bold text-gray-800 mb-3 text-sm uppercase tracking-wider">Room Features</h4>
+            <ul class="space-y-2 text-sm text-gray-600">
+              <li *ngFor="let item of amenities.features" class="flex items-center gap-2"><i class="material-icons text-[16px] text-green-500">check</i> {{ item }}</li>
+            </ul>
+          </div>
+
+          <div *ngIf="amenities.bathroom?.length">
+            <h4 class="font-bold text-gray-800 mb-3 text-sm uppercase tracking-wider">Bathroom</h4>
+            <ul class="space-y-2 text-sm text-gray-600">
+              <li *ngFor="let item of amenities.bathroom" class="flex items-center gap-2"><i class="material-icons text-[16px] text-green-500">check</i> {{ item }}</li>
+            </ul>
+          </div>
+
+          <div *ngIf="amenities.safety?.length">
+            <h4 class="font-bold text-gray-800 mb-3 text-sm uppercase tracking-wider">Safety & Security</h4>
+            <ul class="space-y-2 text-sm text-gray-600">
+              <li *ngFor="let item of amenities.safety" class="flex items-center gap-2"><i class="material-icons text-[16px] text-green-500">check</i> {{ item }}</li>
+            </ul>
+          </div>
+
+          <div *ngIf="amenities.media?.length">
+            <h4 class="font-bold text-gray-800 mb-3 text-sm uppercase tracking-wider">Media & Entertainment</h4>
+            <ul class="space-y-2 text-sm text-gray-600">
+              <li *ngFor="let item of amenities.media" class="flex items-center gap-2"><i class="material-icons text-[16px] text-green-500">check</i> {{ item }}</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rate Plans Section -->
+      <div class="bg-white p-6 md:p-8 mb-4 shadow-sm" *ngIf="getRatePlans(selectedRoomDetails).length > 0">
+        <h3 class="text-xl font-bold text-gray-900 mb-6">Select a Rate Plan</h3>
+        <div class="space-y-6">
+          <div *ngFor="let plan of getRatePlans(selectedRoomDetails)" class="border border-gray-200 rounded-xl overflow-hidden">
+            <div *ngIf="plan.badge" class="bg-blue-600 text-white text-xs font-bold uppercase tracking-wider px-4 py-2">{{ plan.badge }}</div>
+            <div class="p-6 flex flex-col md:flex-row justify-between gap-6">
+              
+              <div class="flex-grow">
+                <h4 class="text-lg font-bold text-gray-900 mb-4">{{ plan.name }}</h4>
+                <ul class="space-y-2">
+                  <li *ngFor="let inclusion of plan.inclusions" class="flex items-start gap-2 text-sm text-gray-700">
+                    <i class="material-icons text-[16px] text-green-500 mt-0.5">verified</i>
+                    <span>{{ inclusion }}</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div class="md:w-64 shrink-0 flex flex-col justify-center items-end text-right border-t md:border-t-0 md:border-l border-gray-200 pt-6 md:pt-0 md:pl-6">
+                <p class="text-xs text-gray-500 uppercase tracking-widest font-semibold mb-1">Per Night</p>
+                <p class="text-3xl font-extrabold text-gray-900 mb-1">₹{{ pricePerNightFor(selectedRoomDetails) * plan.priceMultiplier | number:'1.2-2' }}</p>
+                <p class="text-xs text-gray-500 mb-6">+ ₹{{ (pricePerNightFor(selectedRoomDetails) * plan.priceMultiplier * 0.12) | number:'1.2-2' }} taxes & fees</p>
+                
+                <button (click)="bookPackage(selectedRoomDetails, plan)" [disabled]="selectedRoomDetails.min_available <= 0" 
+                  class="w-full font-bold py-3 px-6 rounded-xl transition-all text-white"
+                  [ngClass]="selectedRoomDetails.min_available <= 0 ? 'bg-slate-400 cursor-not-allowed opacity-70' : 'bg-gradient-to-r from-[var(--primary-color,theme(colors.blue.600))] to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg hover:-translate-y-0.5'">
+                  {{ selectedRoomDetails.min_available <= 0 ? 'Sold Out' : 'Book Now' }}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Guest Reviews Section -->
+      <div class="bg-white p-6 md:p-8 shadow-sm">
+        <h3 class="text-xl font-bold text-gray-900 mb-2">What Guests Said</h3>
+        <p class="text-sm text-gray-500 mb-8">Based on 824 verified reviews</p>
+        
+        <div class="space-y-8">
+          <div *ngFor="let review of mockReviews" class="border-b border-gray-100 pb-8 last:border-0 last:pb-0">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="bg-green-600 text-white text-sm font-bold w-10 h-10 rounded-lg flex items-center justify-center">{{ review.rating | number:'1.1-1' }}</div>
+              <div>
+                <p class="font-bold text-gray-900 text-sm">{{ review.name }}</p>
+                <p class="text-xs text-gray-500 uppercase">{{ review.type }} • {{ review.date }}</p>
+              </div>
+            </div>
+            <p class="text-gray-700 text-sm leading-relaxed mb-4">"{{ review.text }}"</p>
+            <div class="flex items-center gap-2 text-xs text-gray-500 font-medium">
+              Do you find this helpful? 
+              <button class="px-3 py-1 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-full transition-colors">Yes</button>
+              <button class="px-3 py-1 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-full transition-colors">No</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Promotional Offer Popup -->
+<div *ngIf="showOfferPopup && activeOffer" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in" (click)="closeOfferPopup()">
+  <div class="bg-gray-900 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden text-center relative border border-gray-700" (click)="$event.stopPropagation()">
+    <!-- Close button -->
+    <button (click)="closeOfferPopup()" class="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white rounded-full p-2 backdrop-blur transition-colors z-10">
+      <i class="material-icons text-xl leading-none">close</i>
+    </button>
+
+    <!-- Banner Image / Header -->
+    <div *ngIf="activeOffer.banner_image_url" class="h-48 relative overflow-hidden bg-gray-800">
+      <img [src]="activeOffer.banner_image_url" alt="{{ activeOffer.name }}" class="w-full h-full object-cover">
+    </div>
+    
+    <div *ngIf="!activeOffer.banner_image_url" class="h-48 relative overflow-hidden bg-gradient-to-r from-orange-500 to-red-600 flex items-center justify-center">
+       <!-- Use a simple CSS grid pattern instead of external image for reliability -->
+       <div class="absolute inset-0 opacity-20" style="background-image: linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px); background-size: 20px 20px;"></div>
+       <div class="relative z-10 flex items-center gap-3">
+         <i class="material-icons text-white text-6xl drop-shadow-lg">local_offer</i>
+         <div class="text-white text-left">
+           <p class="font-black text-4xl tracking-tighter italic">RUSH</p>
+           <p class="font-black text-4xl tracking-tighter italic text-yellow-300 -mt-2">DEALS</p>
+         </div>
+       </div>
+    </div>
+
+    <div class="p-8">
+      <h2 class="text-3xl font-extrabold text-white mb-2">{{ activeOffer.name }}</h2>
+      <div class="text-gray-300 text-lg mb-8 leading-relaxed text-center flex flex-col items-center justify-center overflow-hidden break-words">
+        <span *ngIf="activeOffer.discount_type === 'percent'" class="font-bold text-yellow-400 text-xl block mb-1">Extra {{ activeOffer.discount_value }}% Off</span>
+        <span *ngIf="activeOffer.discount_type === 'flat'" class="font-bold text-yellow-400 text-xl block mb-1">Flat ₹{{ activeOffer.discount_value }} Off</span>
+        <span>Grab special last-minute discounts!</span>
+      </div>
+      
+      <button (click)="closeOfferPopup()" class="w-full py-4 bg-white text-gray-900 font-bold rounded-xl hover:bg-gray-100 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.3)]">
+        View Properties
+      </button>
     </div>
   </div>
 </div>

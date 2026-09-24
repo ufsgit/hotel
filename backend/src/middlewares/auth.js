@@ -9,22 +9,36 @@ const authMiddleware = async (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
-        req.user = decoded; // Contains id and role (super_admin or user)
+        req.user = decoded;
 
-        // Super admins bypass property-level checks completely
+        // ── Super admin: bypass all property-level checks ─────────────────────
         if (req.user.role === 'super_admin') {
             return next();
         }
 
-        // For regular users, we expect an X-Hotel-ID header if they are trying to access property-specific data.
-        // Some routes (like /api/admin/my-hotels) don't need a specific hotel_id.
+        // ── Impersonation token: trust hotel_id baked into JWT ────────────────
+        // Impersonation tokens are created by the super admin endpoint and contain
+        // `hotel_id` and `impersonated_by` directly in the payload. We validate
+        // the user really does belong to that hotel, then attach the info and proceed.
+        if (decoded.impersonated_by && decoded.hotel_id) {
+            const hotelId = parseInt(decoded.hotel_id, 10);
+            const [rows] = await pool.query(
+                'SELECT role FROM user_hotels WHERE user_id = ? AND hotel_id = ?',
+                [decoded.id, hotelId]
+            );
+            if (rows.length === 0) {
+                return res.status(403).json({ error: 'Forbidden. Impersonated user has no access to this property.' });
+            }
+            req.user.hotel_id = hotelId;
+            req.user.role = rows[0].role;
+            return next();
+        }
+
+        // ── Regular users: use the X-Hotel-ID header ──────────────────────────
         const hotelIdHeader = req.header('X-Hotel-ID');
-        
-        // If the route doesn't require a hotel_id (e.g. /my-hotels or changing personal profile), just proceed.
-        // But for most /api/admin/* routes, they assume req.user.hotel_id exists.
+
+        // If no hotel_id context, pass through (e.g. /my-hotels route)
         if (!hotelIdHeader) {
-            // We'll let it pass, but if the route requires req.user.hotel_id, it will fail there or we could block it here.
-            // Let's pass it, as the /my-hotels route needs to work without one.
             return next();
         }
 
@@ -33,18 +47,19 @@ const authMiddleware = async (req, res, next) => {
             return res.status(400).json({ error: 'Invalid X-Hotel-ID header.' });
         }
 
-        // Check if the user has access to this hotel
-        const [rows] = await pool.query('SELECT role FROM user_hotels WHERE user_id = ? AND hotel_id = ?', [req.user.id, hotelId]);
+        // Verify user has access to this hotel
+        const [rows] = await pool.query(
+            'SELECT role FROM user_hotels WHERE user_id = ? AND hotel_id = ?',
+            [req.user.id, hotelId]
+        );
         if (rows.length === 0) {
             return res.status(403).json({ error: 'Forbidden. You do not have access to this property.' });
         }
 
-        // Attach property-specific info to the request!
-        // This ensures all downstream routes (which expect req.user.hotel_id and req.user.role) continue to work as-is.
         req.user.hotel_id = hotelId;
-        req.user.role = rows[0].role; // Their role *at this specific property* (owner vs staff)
-
+        req.user.role = rows[0].role;
         next();
+
     } catch (ex) {
         console.error('Auth middleware error:', ex);
         res.status(401).json({ error: 'Invalid or expired token.' });
@@ -52,3 +67,4 @@ const authMiddleware = async (req, res, next) => {
 };
 
 module.exports = authMiddleware;
+

@@ -27,6 +27,9 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex justify-between h-16 items-center">
         <div class="flex items-center gap-3 animate-fade-in">
+          <button (click)="goBack()" class="mr-2 p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500" title="Go Back">
+            <i class="material-icons text-xl align-middle">arrow_back</i>
+          </button>
           <div *ngIf="hotel?.branding_logo_url" class="h-10 w-10 rounded-full bg-white shadow-sm flex items-center justify-center p-0.5 border border-gray-200 overflow-hidden">
             <img [src]="hotel?.branding_logo_url" alt="Logo" class="h-full w-full object-cover rounded-full">
           </div>

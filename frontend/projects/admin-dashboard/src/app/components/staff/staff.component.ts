@@ -32,6 +32,7 @@ export class StaffComponent implements OnInit {
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'calendar', label: 'Calendar' },
     { id: 'reservations', label: 'Reservations' },
+    { id: 'active-guests', label: 'Active Guests' },
     { id: 'rooms', label: 'Rooms' },
     { id: 'offers', label: 'Seasons & Offers' },
     { id: 'reports', label: 'Reports' },

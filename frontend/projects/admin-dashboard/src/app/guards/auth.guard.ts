@@ -7,11 +7,7 @@ export const authGuard: CanActivateFn = (route, state) => {
   const router = inject(Router);
 
   if (authService.isLoggedIn()) {
-    let payload: any = null;
-    try {
-      const userStr = localStorage.getItem('user');
-      if (userStr) payload = JSON.parse(userStr);
-    } catch(e) {}
+    const payload = authService.getUser();
     
     // Redirect super admin from hotel admin pages
     if (payload?.role === 'super_admin' && !state.url.startsWith('/manage-hotels')) {

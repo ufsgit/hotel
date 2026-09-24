@@ -28,9 +28,14 @@ export class LoginComponent {
     this.error = '';
 
     this.authService.login(this.email, this.password).subscribe({
-      next: () => {
+      next: (res) => {
         this.isLoading = false;
-        this.router.navigate(['/dashboard']);
+        // Super admin goes to their dashboard; hotel admins go to /dashboard
+        if (res?.user?.role === 'super_admin') {
+          this.router.navigate(['/manage-hotels']);
+        } else {
+          this.router.navigate(['/dashboard']);
+        }
       },
       error: (err) => {
         this.isLoading = false;

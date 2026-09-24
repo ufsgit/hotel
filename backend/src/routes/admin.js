@@ -291,6 +291,16 @@ router.get('/room-types', async (req, res) => {
 
 router.get('/bookings', async (req, res) => {
     try {
+        // Lazy cleanup for Admin Dashboard: Auto-cancel pending & unpaid bookings older than 15 minutes
+        await pool.query(`
+            UPDATE bookings 
+            SET booking_status = 'cancelled' 
+            WHERE hotel_id = ? 
+              AND booking_status = 'pending' 
+              AND payment_status = 'unpaid' 
+              AND created_at < NOW() - INTERVAL 15 MINUTE
+        `, [req.user.hotel_id]);
+
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
@@ -406,6 +416,100 @@ router.get('/bookings/:id/history', async (req, res) => {
     }
 });
 
+// --- EXTEND STAY ---
+// PUT /api/admin/bookings/:id/extend
+// Body: { extra_nights: number }
+// Extends checkout_date, recalculates totals, logs history
+router.put('/bookings/:id/extend', async (req, res) => {
+    try {
+        const { extra_nights } = req.body;
+        if (!extra_nights || isNaN(parseInt(extra_nights)) || parseInt(extra_nights) < 1) {
+            return res.status(400).json({ error: 'extra_nights must be a positive integer.' });
+        }
+        const nights = parseInt(extra_nights);
+
+        // Fetch the booking with room type details and hotel tax rate
+        const [bookings] = await pool.query(`
+            SELECT b.*, rt.base_price, h.tax_rate
+            FROM bookings b
+            JOIN room_types rt ON b.room_type_id = rt.id
+            JOIN hotels h ON b.hotel_id = h.id
+            WHERE b.id = ? AND b.hotel_id = ?
+        `, [req.params.id, req.user.hotel_id]);
+
+        if (bookings.length === 0) {
+            return res.status(404).json({ error: 'Booking not found.' });
+        }
+
+        const booking = bookings[0];
+
+        if (booking.booking_status !== 'checked_in') {
+            return res.status(400).json({ error: 'Can only extend a stay for checked-in guests.' });
+        }
+
+        // Calculate new checkout date
+        const currentCheckout = new Date(booking.check_out_date);
+        const newCheckout = new Date(currentCheckout);
+        newCheckout.setDate(newCheckout.getDate() + nights);
+        const newCheckoutStr = newCheckout.toISOString().split('T')[0];
+
+        // Check room availability for the extended nights
+        const [conflicts] = await pool.query(`
+            SELECT COUNT(*) as conflict_count
+            FROM bookings
+            WHERE room_type_id = ?
+              AND id != ?
+              AND booking_status NOT IN ('cancelled', 'checked_out')
+              AND check_in_date < ?
+              AND check_out_date > ?
+        `, [booking.room_type_id, booking.id, newCheckoutStr, currentCheckout.toISOString().split('T')[0]]);
+
+        // Simple availability check (not per-room inventory, but booking overlap)
+        // For a production system you'd check room_inventory per date
+        // Here we just warn but still allow — the staff decides
+
+        // Calculate additional charge for the extra nights
+        const pricePerNight = parseFloat(booking.base_price);
+        const taxRate = parseFloat(booking.tax_rate) / 100;
+        const extraSubtotal = pricePerNight * nights;
+        const extraTax = parseFloat((extraSubtotal * taxRate).toFixed(2));
+        const extraTotal = parseFloat((extraSubtotal + extraTax).toFixed(2));
+
+        // Update the booking: new checkout date + recalculated totals
+        const newSubtotal = parseFloat(booking.subtotal) + extraSubtotal;
+        const newTaxAmount = parseFloat(booking.tax_amount) + extraTax;
+        const newTotalAmount = parseFloat(booking.total_amount) + extraTotal;
+
+        await pool.query(`
+            UPDATE bookings
+            SET check_out_date = ?,
+                subtotal = ?,
+                tax_amount = ?,
+                total_amount = ?
+            WHERE id = ? AND hotel_id = ?
+        `, [newCheckoutStr, newSubtotal.toFixed(2), newTaxAmount.toFixed(2), newTotalAmount.toFixed(2), req.params.id, req.user.hotel_id]);
+
+        // Log the extension in booking history
+        await pool.query(
+            'INSERT INTO booking_history (booking_id, changed_by, status_type, old_status, new_status) VALUES (?, ?, ?, ?, ?)',
+            [req.params.id, req.user.id, 'booking', `checkout:${booking.check_out_date}`, `checkout:${newCheckoutStr}`]
+        );
+
+        res.json({
+            message: `Stay extended by ${nights} night(s). New checkout: ${newCheckoutStr}.`,
+            extra_nights: nights,
+            extra_subtotal: extraSubtotal,
+            extra_tax: extraTax,
+            extra_total: extraTotal,
+            new_checkout: newCheckoutStr,
+            new_total_amount: newTotalAmount.toFixed(2),
+            room_conflict_count: conflicts[0].conflict_count
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- BOOKING EXPENSES ---
 router.get('/bookings/:id/expenses', async (req, res) => {
     try {
@@ -511,7 +615,7 @@ router.post('/upload-offer-banner', uploadOfferBanner.single('banner'), async (r
 // Room Types CRUD
 router.post('/room-types', async (req, res) => {
     try {
-        const { name, description, base_price, default_capacity, max_capacity, max_occupancy, extra_bed_allowed, extra_bed_price, total_rooms, photos, amenities } = req.body;
+        const { name, description, base_price, default_capacity, max_capacity, max_occupancy, extra_bed_allowed, extra_bed_price, total_rooms, photos, amenities, room_size, view_type, bed_type, detailed_amenities, rate_plans } = req.body;
         
         // Ensure default_capacity has a fallback
         const defCap = default_capacity || 2;
@@ -526,9 +630,17 @@ router.post('/room-types', async (req, res) => {
         if (amenities) {
             amenitiesJson = JSON.stringify(Array.isArray(amenities) ? amenities : [amenities]);
         }
+        let detailedAmenitiesJson = null;
+        if (detailed_amenities) {
+            detailedAmenitiesJson = JSON.stringify(detailed_amenities);
+        }
+        let ratePlansJson = null;
+        if (rate_plans) {
+            ratePlansJson = JSON.stringify(Array.isArray(rate_plans) ? rate_plans : [rate_plans]);
+        }
         const [result] = await pool.query(
-            'INSERT INTO room_types (hotel_id, name, description, default_capacity, base_price, max_occupancy, extra_bed_allowed, extra_bed_price, total_rooms, photos, amenities) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [req.user.hotel_id, name || '', description || '', defCap, base_price || 0, maxOcc, extra_bed_allowed ? 1 : 0, extra_bed_price || 0, total_rooms || 10, photosJson, amenitiesJson]
+            'INSERT INTO room_types (hotel_id, name, description, default_capacity, base_price, max_occupancy, extra_bed_allowed, extra_bed_price, total_rooms, photos, amenities, room_size, view_type, bed_type, detailed_amenities, rate_plans) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [req.user.hotel_id, name || '', description || '', defCap, base_price || 0, maxOcc, extra_bed_allowed ? 1 : 0, extra_bed_price || 0, total_rooms || 10, photosJson, amenitiesJson, room_size || null, view_type || null, bed_type || null, detailedAmenitiesJson, ratePlansJson]
         );
         res.json({ id: result.insertId, message: 'Room type created' });
     } catch (err) {
@@ -538,7 +650,7 @@ router.post('/room-types', async (req, res) => {
 
 router.put('/room-types/:id', async (req, res) => {
     try {
-        const { name, description, base_price, default_capacity, max_capacity, max_occupancy, extra_bed_allowed, extra_bed_price, total_rooms, photos, amenities } = req.body;
+        const { name, description, base_price, default_capacity, max_capacity, max_occupancy, extra_bed_allowed, extra_bed_price, total_rooms, photos, amenities, room_size, view_type, bed_type, detailed_amenities, rate_plans } = req.body;
         
         const defCap = default_capacity || 2;
         const maxOcc = defCap + (extra_bed_allowed ? 1 : 0);
@@ -551,9 +663,18 @@ router.put('/room-types/:id', async (req, res) => {
         if (amenities !== undefined) {
             amenitiesJson = JSON.stringify(Array.isArray(amenities) ? amenities : (amenities ? [amenities] : []));
         }
+        let detailedAmenitiesJson = null;
+        if (detailed_amenities !== undefined) {
+            detailedAmenitiesJson = detailed_amenities ? JSON.stringify(detailed_amenities) : null;
+        }
+        let ratePlansJson = null;
+        if (rate_plans !== undefined) {
+            ratePlansJson = rate_plans ? JSON.stringify(Array.isArray(rate_plans) ? rate_plans : [rate_plans]) : null;
+        }
+
         await pool.query(
-            'UPDATE room_types SET name = ?, description = ?, default_capacity = ?, base_price = ?, max_occupancy = ?, extra_bed_allowed = ?, extra_bed_price = ?, total_rooms = COALESCE(?, total_rooms), photos = COALESCE(?, photos), amenities = COALESCE(?, amenities) WHERE id = ? AND hotel_id = ?',
-            [name, description || '', defCap, base_price || 0, maxOcc, extra_bed_allowed ? 1 : 0, extra_bed_price || 0, total_rooms, photosJson, amenitiesJson, req.params.id, req.user.hotel_id]
+            'UPDATE room_types SET name = ?, description = ?, default_capacity = ?, base_price = ?, max_occupancy = ?, extra_bed_allowed = ?, extra_bed_price = ?, total_rooms = COALESCE(?, total_rooms), photos = COALESCE(?, photos), amenities = COALESCE(?, amenities), room_size = COALESCE(?, room_size), view_type = COALESCE(?, view_type), bed_type = COALESCE(?, bed_type), detailed_amenities = COALESCE(?, detailed_amenities), rate_plans = COALESCE(?, rate_plans) WHERE id = ? AND hotel_id = ?',
+            [name, description || '', defCap, base_price || 0, maxOcc, extra_bed_allowed ? 1 : 0, extra_bed_price || 0, total_rooms, photosJson, amenitiesJson, room_size, view_type, bed_type, detailedAmenitiesJson, ratePlansJson, req.params.id, req.user.hotel_id]
         );
         res.json({ message: 'Room type updated' });
     } catch (err) {
@@ -819,7 +940,17 @@ router.get('/reports/stat-details', async (req, res) => {
         let params = [hotelId, ...dateFilterParams];
 
         if (metric === 'revenue') {
-            query += ` AND b.booking_status != 'cancelled' AND b.payment_status IN ('paid', 'partial') ${dateFilter} ORDER BY b.created_at DESC`;
+            // Need to include bookings that were paid/partial, OR bookings that have paid/partial expenses
+            query += ` AND b.booking_status != 'cancelled' 
+                       AND (
+                           (b.payment_status IN ('paid', 'partial') ${dateFilter})
+                           OR
+                           b.id IN (
+                               SELECT booking_id FROM booking_expenses be 
+                               WHERE be.payment_status IN ('paid', 'partial') ${dateFilter.replace(/b\.created_at/g, 'be.created_at')}
+                           )
+                       )
+                       ORDER BY b.created_at DESC`;
         } else if (metric === 'bookings') {
             query += ` AND b.booking_status != 'cancelled' ${dateFilter} ORDER BY b.created_at DESC`;
         } else if (metric === 'arrivals') {
@@ -876,11 +1007,11 @@ router.get('/offers', async (req, res) => {
 
 router.post('/offers', async (req, res) => {
     try {
-        const { name, description, banner_image_url, discount_type, discount_value, start_date, end_date, is_active, priority } = req.body;
+        const { name, description, banner_image_url, discount_type, discount_value, start_date, end_date, is_active, priority, is_rush_deal } = req.body;
         const [result] = await pool.query(
-            `INSERT INTO seasons_offers (hotel_id, name, description, banner_image_url, discount_type, discount_value, start_date, end_date, is_active, priority)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [req.user.hotel_id, name, description || '', banner_image_url || '', discount_type, discount_value, start_date, end_date, is_active || false, priority || 0]
+            `INSERT INTO seasons_offers (hotel_id, name, description, banner_image_url, discount_type, discount_value, start_date, end_date, is_active, priority, is_rush_deal)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [req.user.hotel_id, name, description || '', banner_image_url || '', discount_type, discount_value, start_date, end_date, is_active || false, priority || 0, is_rush_deal || false]
         );
         res.json({ id: result.insertId, message: 'Offer created' });
     } catch (err) {
@@ -890,11 +1021,11 @@ router.post('/offers', async (req, res) => {
 
 router.put('/offers/:id', async (req, res) => {
     try {
-        const { name, description, banner_image_url, discount_type, discount_value, start_date, end_date, is_active, priority } = req.body;
+        const { name, description, banner_image_url, discount_type, discount_value, start_date, end_date, is_active, priority, is_rush_deal } = req.body;
         await pool.query(
-            `UPDATE seasons_offers SET name=?, description=?, banner_image_url=?, discount_type=?, discount_value=?, start_date=?, end_date=?, is_active=?, priority=?
+            `UPDATE seasons_offers SET name=?, description=?, banner_image_url=?, discount_type=?, discount_value=?, start_date=?, end_date=?, is_active=?, priority=?, is_rush_deal=?
              WHERE id=? AND hotel_id=?`,
-            [name, description, banner_image_url, discount_type, discount_value, start_date, end_date, is_active, priority, req.params.id, req.user.hotel_id]
+            [name, description, banner_image_url, discount_type, discount_value, start_date, end_date, is_active, priority, is_rush_deal || false, req.params.id, req.user.hotel_id]
         );
         res.json({ message: 'Offer updated' });
     } catch (err) {
@@ -1005,28 +1136,33 @@ router.get('/hotel-settings', async (req, res) => {
     }
 });
 
+// PUT /hotel-settings — update editable hotel settings
 router.put('/hotel-settings', async (req, res) => {
     try {
-        const { name, address, contact_email, contact_phone, branding_logo_url, branding_primary_color, timezone, tax_rate, razorpay_key_id, razorpay_key_secret } = req.body;
-        await pool.query(
-            `UPDATE hotels SET
-                name = COALESCE(?, name),
-                address = COALESCE(?, address),
-                contact_email = COALESCE(?, contact_email),
-                contact_phone = COALESCE(?, contact_phone),
-                branding_logo_url = COALESCE(?, branding_logo_url),
-                branding_primary_color = COALESCE(?, branding_primary_color),
-                timezone = COALESCE(?, timezone),
-                tax_rate = COALESCE(?, tax_rate),
-                razorpay_key_id = COALESCE(?, razorpay_key_id),
-                razorpay_key_secret = COALESCE(?, razorpay_key_secret)
-             WHERE id = ?`,
-            [name, address, contact_email, contact_phone, branding_logo_url, branding_primary_color, timezone, tax_rate ?? null, razorpay_key_id ?? null, razorpay_key_secret ?? null, req.user.hotel_id]
-        );
-        res.json({ message: 'Hotel settings updated successfully' });
+        if (req.user.role === 'super_admin') {
+            return res.status(403).json({ error: 'Super admins cannot modify hotel settings via this endpoint.' });
+        }
+        const { tax_rate, razorpay_key_id, razorpay_key_secret, branding_primary_color, branding_logo_url } = req.body;
+
+        const updates = [];
+        const values = [];
+
+        if (tax_rate !== undefined) { updates.push('tax_rate = ?'); values.push(parseFloat(tax_rate)); }
+        if (razorpay_key_id !== undefined) { updates.push('razorpay_key_id = ?'); values.push(razorpay_key_id); }
+        if (razorpay_key_secret !== undefined && razorpay_key_secret !== '') { updates.push('razorpay_key_secret = ?'); values.push(razorpay_key_secret); }
+        if (branding_primary_color !== undefined) { updates.push('branding_primary_color = ?'); values.push(branding_primary_color); }
+        if (branding_logo_url !== undefined) { updates.push('branding_logo_url = ?'); values.push(branding_logo_url); }
+
+        if (updates.length === 0) return res.json({ success: true, message: 'Nothing to update.' });
+
+        values.push(req.user.hotel_id);
+        await pool.query(`UPDATE hotels SET ${updates.join(', ')} WHERE id = ?`, values);
+
+        res.json({ success: true, message: 'Settings saved successfully.' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
+
 
 module.exports = router;

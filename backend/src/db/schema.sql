@@ -11,6 +11,11 @@ CREATE TABLE IF NOT EXISTS hotels (
     branding_logo_url VARCHAR(255),
     branding_primary_color VARCHAR(20),
     timezone VARCHAR(50) DEFAULT 'UTC',
+    cancellation_allowed TINYINT(1) DEFAULT 1,
+    cancellation_fee_type ENUM('percentage', 'flat') DEFAULT 'percentage',
+    cancellation_fee DECIMAL(10,2) DEFAULT 0.00,
+    auto_refund TINYINT(1) DEFAULT 0,
+    min_days_before_cancel INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

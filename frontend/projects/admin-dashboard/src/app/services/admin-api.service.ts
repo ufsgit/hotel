@@ -11,8 +11,11 @@ export class AdminApiService {
   constructor(private http: HttpClient) { }
 
   private getHeaders(): HttpHeaders {
-    const token = localStorage.getItem('token');
-    const hotelId = localStorage.getItem('active_hotel_id');
+    // Use hotel admin token specifically — never use the super admin token (sa_token)
+    // for hotel-scoped requests to prevent cross-session contamination
+    const token = sessionStorage.getItem('impersonate_token') || localStorage.getItem('token');
+    // Prefer sessionStorage hotel id (impersonation tab) over localStorage
+    const hotelId = sessionStorage.getItem('impersonate_hotel_id') || localStorage.getItem('active_hotel_id');
     let headers = new HttpHeaders({ 'Authorization': `Bearer ${token}` });
     if (hotelId) {
       headers = headers.append('X-Hotel-ID', hotelId);
@@ -37,6 +40,10 @@ export class AdminApiService {
 
   getBookingHistory(id: number): Observable<any> {
     return this.http.get(`${this.baseUrl}/bookings/${id}/history`, { headers: this.getHeaders() });
+  }
+
+  extendStay(id: number, extraNights: number): Observable<any> {
+    return this.http.put(`${this.baseUrl}/bookings/${id}/extend`, { extra_nights: extraNights }, { headers: this.getHeaders() });
   }
 
   // --- BOOKING EXPENSES ---

@@ -1,8 +1,8 @@
 const pool = require('../config/db');
 
-async function calculatePrice(hotel_id, room_type_id, check_in, check_out, guests, promo_code_str = null) {
-    const [roomTypes] = await pool.query('SELECT base_price, extra_bed_price, max_occupancy, default_capacity FROM room_types WHERE id = ?', [room_type_id]);
-    if (roomTypes.length === 0) throw new Error('Room type not found');
+async function calculatePrice(hotel_id, room_type_id, check_in, check_out, guests, promo_code_str = null, rateMultiplier = 1.0, numRooms = 1) {
+    const [roomTypes] = await pool.query('SELECT base_price, extra_bed_price, max_occupancy, default_capacity FROM room_types WHERE id = ? AND hotel_id = ?', [room_type_id, hotel_id]);
+    if (roomTypes.length === 0) throw new Error('Room type not found or belongs to another hotel');
     const room = roomTypes[0];
 
     // Fetch hotel tax rate
@@ -15,14 +15,15 @@ async function calculatePrice(hotel_id, room_type_id, check_in, check_out, guest
     
     if (nights <= 0) throw new Error('Invalid dates');
 
-    let baseTotal = parseFloat(room.base_price) * nights;
+    // Rate packages typically multiply the base room rate (not extra bed charges)
+    let baseTotal = (parseFloat(room.base_price) * parseFloat(rateMultiplier)) * nights * numRooms;
     
     // Extra beds: guests beyond the default (base) capacity require extra beds
     let extraBeds = 0;
     let extraBedCharge = 0;
-    const defaultCap = room.default_capacity || room.max_occupancy || 2;
-    if (guests > defaultCap) {
-        extraBeds = guests - defaultCap;
+    const totalDefaultCap = (room.default_capacity || room.max_occupancy || 2) * numRooms;
+    if (guests > totalDefaultCap) {
+        extraBeds = guests - totalDefaultCap;
         extraBedCharge = extraBeds * parseFloat(room.extra_bed_price || 0) * nights;
         baseTotal += extraBedCharge;
     }

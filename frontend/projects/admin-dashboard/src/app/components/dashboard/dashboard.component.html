@@ -79,14 +79,6 @@
           </span>
           Revenue Trend
         </h3>
-        <button (click)="toggleLineEditor()"
-          class="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all"
-          [ngClass]="showLineEditor
-            ? 'bg-blue-600 text-white border-blue-600 shadow'
-            : 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50'">
-          <i class="material-icons" style="font-size:15px">{{ showLineEditor ? 'close' : 'edit' }}</i>
-          {{ showLineEditor ? 'Close' : 'Edit Data' }}
-        </button>
       </div>
 
       <!-- Line Chart Editor Panel -->
@@ -139,14 +131,6 @@
           </span>
           Occupancy by Room Type
         </h3>
-        <button (click)="toggleBarEditor()"
-          class="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all"
-          [ngClass]="showBarEditor
-            ? 'bg-orange-500 text-white border-orange-500 shadow'
-            : 'bg-white text-orange-500 border-orange-200 hover:bg-orange-50'">
-          <i class="material-icons" style="font-size:15px">{{ showBarEditor ? 'close' : 'edit' }}</i>
-          {{ showBarEditor ? 'Close' : 'Edit Data' }}
-        </button>
       </div>
 
       <!-- Bar Chart Editor Panel -->

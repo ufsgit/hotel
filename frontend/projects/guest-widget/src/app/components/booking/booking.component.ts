@@ -19,12 +19,15 @@ export class BookingComponent implements OnInit {
     checkIn: '',
     checkOut: '',
     guests: 2,
+    rooms: 1,
     guest_name: '',
     guest_email: '',
     guest_phone: '',
     promo_code: '',
-    paymentOption: 'pay_full'
+    paymentOption: 'pay_full',
+    rateMultiplier: 1.0
   };
+  hotel: any = null;
   pricing: any = null;
   isSubmitting = false;
   isCalculating = false;
@@ -42,14 +45,25 @@ export class BookingComponent implements OnInit {
       this.bookingData.checkIn = params['checkIn'];
       this.bookingData.checkOut = params['checkOut'];
       this.bookingData.guests = params['guests'];
+      this.bookingData.rooms = params['rooms'] || 1;
+      this.bookingData.rateMultiplier = params['rateMultiplier'] || 1.0;
       this.hotelSlug = params['hotel'] || '';
       
       if (!this.bookingData.roomTypeId) {
         this.router.navigate(['/']);
       } else {
         this.calculatePrice();
+        this.loadHotel();
       }
     });
+  }
+
+  loadHotel(): void {
+    if (this.hotelSlug) {
+      this.apiService.getHotelInfo(this.hotelSlug).subscribe(data => {
+        this.hotel = data;
+      });
+    }
   }
 
   calculatePrice(): void {
@@ -59,7 +73,9 @@ export class BookingComponent implements OnInit {
       check_in_date: this.bookingData.checkIn,
       check_out_date: this.bookingData.checkOut,
       num_guests: this.bookingData.guests,
-      promo_code: this.bookingData.promo_code
+      num_rooms: this.bookingData.rooms,
+      promo_code: this.bookingData.promo_code,
+      rate_multiplier: this.bookingData.rateMultiplier
     };
     
     this.apiService.calculatePrice(this.hotelSlug, payload).subscribe({
@@ -95,7 +111,9 @@ export class BookingComponent implements OnInit {
       check_in_date: this.bookingData.checkIn,
       check_out_date: this.bookingData.checkOut,
       num_guests: this.bookingData.guests,
-      promo_code: this.bookingData.promo_code
+      num_rooms: this.bookingData.rooms,
+      promo_code: this.bookingData.promo_code,
+      rate_multiplier: this.bookingData.rateMultiplier
     };
 
     this.apiService.bookRoom(this.hotelSlug, payload).subscribe({

@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { CommonModule } from '@angular/common';
-import { ActivatedRoute } from '@angular/router';
+import { CommonModule, Location } from '@angular/common';
+import { ActivatedRoute, Router } from '@angular/router';
 import { ApiService } from './services/api.service';
 
 @Component({
@@ -16,38 +16,70 @@ export class AppComponent implements OnInit {
   hotel: any = null;
   hotelError = false;
   isLoading = true;
+  hotelSlug = '';
+  platformDefaultColor = '#6366f1'; // updated from platform settings on init
 
-  constructor(private api: ApiService, private route: ActivatedRoute) {}
+  constructor(
+    private api: ApiService, 
+    private route: ActivatedRoute, 
+    private router: Router,
+    private location: Location
+  ) {}
+
+  goBack(): void {
+    this.location.back();
+  }
 
   ngOnInit(): void {
-    // In the root component, using URLSearchParams is often more reliable 
-    // before the initial navigation completes than ActivatedRoute.
-    const params = new URLSearchParams(window.location.search);
-    const slug = params.get('hotel');
+    // Load platform default color first so fallback is correct
+    this.api.getPlatformBranding().subscribe({
+      next: (branding) => {
+        this.platformDefaultColor = branding.default_primary_color || '#6366f1';
+        // Apply platform default immediately; hotel color will override if set
+        document.documentElement.style.setProperty('--hotel-primary', this.platformDefaultColor);
+      },
+      error: () => { /* keep the hardcoded default */ }
+    });
 
-    if (!slug) {
+    // Try from URL search params first (initial page load)
+    const params = new URLSearchParams(window.location.search);
+    this.hotelSlug = params.get('hotel') || '';
+
+    // Also watch for Angular route changes
+    this.route.queryParams.subscribe(qp => {
+      const newSlug = qp['hotel'] || '';
+      if (newSlug && newSlug !== this.hotelSlug) {
+        this.hotelSlug = newSlug;
+        this.loadHotel(newSlug);
+      } else if (newSlug && !this.hotel) {
+        this.loadHotel(newSlug);
+      }
+    });
+
+    if (this.hotelSlug) {
+      this.loadHotel(this.hotelSlug);
+    } else {
       this.hotelError = true;
       this.isLoading = false;
-      return;
     }
+  }
 
+  private loadHotel(slug: string): void {
+    this.isLoading = true;
     this.api.getHotelInfo(slug).subscribe({
       next: (data) => {
         this.hotel = data;
         this.isLoading = false;
         this.hotelError = false;
-        if (data.branding_primary_color) {
-          document.documentElement.style.setProperty('--hotel-primary', data.branding_primary_color);
-        }
+        // Use hotel's own color, fallback to platform default (not hardcoded)
+        const color = data.branding_primary_color || this.platformDefaultColor;
+        document.documentElement.style.setProperty('--hotel-primary', color);
       },
       error: (err) => {
         console.error('Failed to load hotel info', err);
-        // Fallback for debugging:
         this.hotelError = true;
         this.isLoading = false;
       }
     });
   }
 }
-
-

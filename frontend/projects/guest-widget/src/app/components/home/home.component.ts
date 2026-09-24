@@ -1,13 +1,13 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './home.component.html'
 })
 export class HomeComponent implements OnInit {
@@ -17,6 +17,7 @@ export class HomeComponent implements OnInit {
   
   checkIn: string = '';
   checkOut: string = '';
+  rooms: number = 1;
   guests: number = 2;
 
   constructor(private apiService: ApiService, private router: Router, private route: ActivatedRoute) {}
@@ -56,6 +57,7 @@ export class HomeComponent implements OnInit {
       queryParams: {
         checkIn: this.checkIn,
         checkOut: this.checkOut,
+        rooms: this.rooms,
         guests: this.guests
       },
       queryParamsHandling: 'merge'

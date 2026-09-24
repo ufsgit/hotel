@@ -1,0 +1,176 @@
+<div class="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+  <div class="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
+    <!-- Header -->
+    <div class="p-6 border-b border-gray-100 flex items-center justify-between"
+      [style.backgroundColor]="effectivePrimaryColor">
+      <div class="flex items-center gap-3 text-white">
+        <button [routerLink]="['/']" [queryParams]="{ hotel: hotelSlug }" class="hover:bg-white/20 p-2 rounded-full transition-colors">
+          <i class="material-icons">arrow_back</i>
+        </button>
+        <h2 class="text-lg font-bold">My Booking</h2>
+      </div>
+    </div>
+
+    <div class="p-6 space-y-6">
+      
+      <!-- Lookup Form (Only show if no details yet or error occurred) -->
+      <div *ngIf="!bookingDetails" class="space-y-4">
+        <p class="text-sm text-gray-500 mb-4">Enter your booking reference ID and email address to check your reservation status or to cancel your booking.</p>
+        
+        <div *ngIf="error" class="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl border border-red-100 flex items-start gap-2">
+          <i class="material-icons text-[18px]">error_outline</i>
+          <p>{{ error }}</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Booking ID</label>
+          <input type="text" [(ngModel)]="bookingId" placeholder="e.g. 1234" name="bookingId"
+            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Email Address</label>
+          <input type="email" [(ngModel)]="guestEmail" placeholder="name@email.com"
+            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
+        </div>
+
+        <button (click)="checkStatus()" [disabled]="isLoading || !bookingId || !guestEmail"
+          class="w-full py-3.5 rounded-xl text-white font-bold tracking-wide transition-colors flex items-center justify-center gap-2 mt-4"
+          [style.backgroundColor]="effectivePrimaryColor">
+          <span *ngIf="isLoading" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+          {{ isLoading ? 'Checking...' : 'Check Status' }}
+        </button>
+      </div>
+
+      <!-- Booking Details -->
+      <div *ngIf="bookingDetails" class="space-y-5 animate-fade-in">
+        
+        <div *ngIf="successMsg" class="bg-emerald-50 text-emerald-700 text-sm px-4 py-3 rounded-xl border border-emerald-100 flex items-start gap-2">
+          <i class="material-icons text-[18px]">check_circle</i>
+          <p>{{ successMsg }}</p>
+        </div>
+
+        <div *ngIf="error" class="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl border border-red-100 flex items-start gap-2">
+          <i class="material-icons text-[18px]">error_outline</i>
+          <p>{{ error }}</p>
+        </div>
+
+        <div class="flex justify-between items-center pb-4 border-b border-gray-100">
+          <div>
+            <div class="text-xs text-gray-500 uppercase tracking-wider font-bold mb-1">Status</div>
+            <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold capitalize"
+              [ngClass]="{
+                'bg-amber-100 text-amber-700': bookingDetails.booking_status === 'pending',
+                'bg-emerald-100 text-emerald-700': bookingDetails.booking_status === 'confirmed',
+                'bg-blue-100 text-blue-700': bookingDetails.booking_status === 'checked_in',
+                'bg-gray-100 text-gray-700': bookingDetails.booking_status === 'checked_out',
+                'bg-red-100 text-red-700': bookingDetails.booking_status === 'cancelled'
+              }">
+              {{ bookingDetails.booking_status.replace('_', ' ') }}
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs text-gray-500 uppercase tracking-wider font-bold mb-1">Booking ID</div>
+            <div class="text-lg font-black text-gray-900">#{{ bookingDetails.id }}</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div class="bg-gray-50 p-3 rounded-xl">
+            <div class="text-[10px] text-gray-400 font-bold uppercase mb-1">Check In</div>
+            <div class="text-sm font-bold text-gray-700">{{ bookingDetails.check_in_date | date:'mediumDate' }}</div>
+          </div>
+          <div class="bg-gray-50 p-3 rounded-xl">
+            <div class="text-[10px] text-gray-400 font-bold uppercase mb-1">Check Out</div>
+            <div class="text-sm font-bold text-gray-700">{{ bookingDetails.check_out_date | date:'mediumDate' }}</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs text-gray-500 uppercase tracking-wider font-bold mb-1">Room Details</div>
+          <div class="text-sm font-medium text-gray-800">{{ bookingDetails.room_type_name }}</div>
+          <div class="text-xs text-gray-500 mt-1">Booked under {{ bookingDetails.guest_name }}</div>
+        </div>
+
+        <div class="flex justify-between items-center py-4 border-y border-gray-100">
+          <div>
+            <div class="text-xs text-gray-500 uppercase tracking-wider font-bold mb-1">Total Amount</div>
+            <div class="text-lg font-black text-gray-900">₹{{ bookingDetails.total_amount }}</div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs text-gray-500 uppercase tracking-wider font-bold mb-1">Payment Status</div>
+            <div class="text-sm font-bold capitalize"
+              [ngClass]="{
+                'text-red-500': bookingDetails.payment_status === 'unpaid',
+                'text-amber-500': bookingDetails.payment_status === 'partial',
+                'text-emerald-500': bookingDetails.payment_status === 'paid'
+              }">
+              {{ bookingDetails.payment_status }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Cancellation Section -->
+        <div *ngIf="canCancel()" class="bg-red-50/50 border border-red-100 rounded-xl p-4 space-y-3">
+          <h4 class="text-sm font-bold text-red-800">Need to cancel?</h4>
+          <p class="text-xs text-red-600 leading-relaxed">{{ cancellationFeeText }}</p>
+          
+          <button (click)="cancelBooking()" [disabled]="isCancelling"
+            class="w-full py-2.5 rounded-lg bg-white border border-red-200 text-red-600 hover:bg-red-50 font-bold text-sm transition-colors flex justify-center items-center gap-2">
+            <span *ngIf="isCancelling" class="inline-block w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></span>
+            {{ isCancelling ? 'Cancelling...' : 'Cancel Booking' }}
+          </button>
+        </div>
+
+        <!-- Refund Status Tracker -->
+        <div *ngIf="bookingDetails.booking_status === 'cancelled' && bookingDetails.refund_status && bookingDetails.refund_status !== 'none'" 
+          class="border rounded-xl p-4 space-y-3"
+          [ngClass]="{
+            'bg-amber-50/50 border-amber-200': bookingDetails.refund_status === 'processing',
+            'bg-emerald-50/50 border-emerald-200': bookingDetails.refund_status === 'completed',
+            'bg-red-50/50 border-red-200': bookingDetails.refund_status === 'failed'
+          }">
+          <div class="flex items-center gap-2">
+            <i class="material-icons text-lg"
+              [ngClass]="{
+                'text-amber-600': bookingDetails.refund_status === 'processing',
+                'text-emerald-600': bookingDetails.refund_status === 'completed',
+                'text-red-600': bookingDetails.refund_status === 'failed'
+              }">
+              {{ bookingDetails.refund_status === 'completed' ? 'check_circle' : bookingDetails.refund_status === 'failed' ? 'error' : 'hourglass_top' }}
+            </i>
+            <h4 class="text-sm font-bold"
+              [ngClass]="{
+                'text-amber-800': bookingDetails.refund_status === 'processing',
+                'text-emerald-800': bookingDetails.refund_status === 'completed',
+                'text-red-800': bookingDetails.refund_status === 'failed'
+              }">
+              {{ bookingDetails.refund_status === 'completed' ? 'Refund Completed' : bookingDetails.refund_status === 'failed' ? 'Refund Failed' : 'Refund Processing' }}
+            </h4>
+          </div>
+          <div *ngIf="bookingDetails.refund_amount" class="text-sm font-bold"
+            [ngClass]="{
+              'text-amber-700': bookingDetails.refund_status === 'processing',
+              'text-emerald-700': bookingDetails.refund_status === 'completed',
+              'text-red-700': bookingDetails.refund_status === 'failed'
+            }">
+            Refund Amount: ₹{{ bookingDetails.refund_amount }}
+          </div>
+          <p class="text-xs leading-relaxed"
+            [ngClass]="{
+              'text-amber-600': bookingDetails.refund_status === 'processing',
+              'text-emerald-600': bookingDetails.refund_status === 'completed',
+              'text-red-600': bookingDetails.refund_status === 'failed'
+            }">
+            {{ bookingDetails.refund_status === 'completed' ? 'Your refund has been processed. It will be credited to your original payment method within 5-7 business days.' : bookingDetails.refund_status === 'failed' ? 'The refund attempt failed. Please contact the hotel for assistance.' : 'Your refund is being processed. Please check back shortly.' }}
+          </p>
+        </div>
+
+        <button (click)="bookingDetails = null" class="w-full py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-sm transition-colors">
+          Look up another booking
+        </button>
+
+      </div>
+
+    </div>
+  </div>
+</div>

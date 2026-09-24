@@ -11,6 +11,11 @@ const uploadsDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 app.use(cors());
+
+// Webhook routes MUST be registered before express.json() to preserve raw body for signature verification
+const webhookRoutes = require('./routes/webhooks');
+app.use('/api/webhooks', webhookRoutes);
+
 app.use(express.json());
 
 // Serve uploaded files as static assets

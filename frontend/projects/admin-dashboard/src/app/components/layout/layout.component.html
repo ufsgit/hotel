@@ -46,7 +46,7 @@
           <i class="material-icons text-xl" [ngClass]="{'mr-3': !isSidebarCollapsed}">list_alt</i>
           <span *ngIf="!isSidebarCollapsed" class="whitespace-nowrap animate-fade-in">Reservations</span>
         </a>
-        <a *ngIf="hasPermission('reservations')" routerLink="/active-guests" routerLinkActive="active-link" class="sidebar-link flex items-center px-3 py-3 rounded-xl text-sm transition-all group" [ngClass]="{'justify-center': isSidebarCollapsed}">
+        <a *ngIf="hasPermission('active-guests')" routerLink="/active-guests" routerLinkActive="active-link" class="sidebar-link flex items-center px-3 py-3 rounded-xl text-sm transition-all group" [ngClass]="{'justify-center': isSidebarCollapsed}">
           <i class="material-icons text-xl" [ngClass]="{'mr-3': !isSidebarCollapsed}">room_service</i>
           <span *ngIf="!isSidebarCollapsed" class="whitespace-nowrap animate-fade-in">Active Guests</span>
         </a>
@@ -91,6 +91,9 @@
     <!-- Topbar -->
     <header class="h-16 glass flex items-center justify-between px-6 border-b border-slate-200/50 z-10 shadow-sm transition-all duration-300">
       <div class="flex items-center gap-3">
+        <button (click)="goBack()" class="p-1.5 mr-1 rounded-lg hover:bg-slate-100 transition-colors text-slate-500 focus:outline-none" title="Go Back">
+          <i class="material-icons text-xl align-middle">arrow_back</i>
+        </button>
         <div *ngIf="hotel?.branding_logo_url && userRole !== 'super_admin'" class="w-8 h-8 rounded-full overflow-hidden border border-slate-200 shadow-2xs bg-white flex items-center justify-center p-0.5">
           <img [src]="hotel.branding_logo_url" alt="Logo" class="w-full h-full object-cover rounded-full">
         </div>
@@ -126,8 +129,8 @@
     </header>
 
     <!-- Page Content -->
-    <div class="flex-1 overflow-y-auto p-4 sm:p-8 relative z-0">
-      <div class="animate-fade-in relative z-10" *ngIf="userRole === 'super_admin' || activeHotelId">
+    <div class="flex-1 overflow-y-auto p-4 sm:p-8">
+      <div *ngIf="userRole === 'super_admin' || activeHotelId">
         <router-outlet></router-outlet>
       </div>
       <div *ngIf="userRole !== 'super_admin' && !activeHotelId" class="flex items-center justify-center h-full">

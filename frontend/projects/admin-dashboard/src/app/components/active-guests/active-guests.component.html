@@ -59,9 +59,14 @@
             </div>
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-            <button (click)="openExpensesModal(guest)" class="px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ml-auto">
-              <i class="material-icons text-sm">receipt_long</i> Expenses
-            </button>
+            <div class="flex items-center justify-end gap-2">
+              <button (click)="openExtendModal(guest)" class="px-3 py-2 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5" title="Extend Stay">
+                <i class="material-icons text-sm">more_time</i> Extend
+              </button>
+              <button (click)="openExpensesModal(guest)" class="px-3 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5">
+                <i class="material-icons text-sm">receipt_long</i> Expenses
+              </button>
+            </div>
           </td>
         </tr>
       </tbody>
@@ -197,3 +202,48 @@
   [guest]="detailsGuest"
   (close)="closeGuestDetailsModal()">
 </app-guest-details-modal>
+
+<!-- ── Extend Stay Modal ──────────────────────────────────────────────── -->
+<div *ngIf="isExtendModalOpen && extendGuest" class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" (click)="closeExtendModal()">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden" (click)="$event.stopPropagation()">
+    <div class="p-5 border-b border-gray-100 bg-amber-50 flex justify-between items-start">
+      <div>
+        <h2 class="text-xl font-bold text-amber-800 flex items-center gap-2">
+          <i class="material-icons text-amber-600">more_time</i> Extend Stay
+        </h2>
+        <p class="text-sm text-amber-700 mt-1">Add extra nights to <b>{{ extendGuest.guest_name }}</b>'s booking.</p>
+      </div>
+      <button (click)="closeExtendModal()" class="text-amber-500 hover:text-amber-700 p-1">
+        <i class="material-icons">close</i>
+      </button>
+    </div>
+
+    <div class="p-6">
+      <div class="mb-4">
+        <label class="block text-sm font-bold text-gray-700 mb-2">Number of Extra Nights</label>
+        <div class="flex items-center gap-3">
+          <button (click)="extendNights = extendNights > 1 ? extendNights - 1 : 1" class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors">
+            <i class="material-icons">remove</i>
+          </button>
+          <input type="number" [(ngModel)]="extendNights" min="1" class="w-20 h-10 text-center font-bold text-lg border border-gray-300 rounded-lg focus:ring-amber-500 focus:border-amber-500 outline-none">
+          <button (click)="extendNights = extendNights + 1" class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors">
+            <i class="material-icons">add</i>
+          </button>
+        </div>
+      </div>
+      
+      <div class="bg-gray-50 rounded-lg p-4 mb-2">
+        <div class="text-sm text-gray-600 mb-1">Current Checkout: <b>{{ extendGuest.check_out_date | date:'mediumDate' }}</b></div>
+        <div class="text-xs text-gray-500">Note: Room charges will be automatically recalculated based on the room's daily rate and added to the booking total.</div>
+      </div>
+    </div>
+
+    <div class="p-5 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+      <button (click)="closeExtendModal()" class="px-5 py-2 text-gray-600 font-bold hover:bg-gray-200 rounded-lg transition-colors">Cancel</button>
+      <button (click)="extendStay()" [disabled]="isExtending || extendNights < 1" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+        <span *ngIf="isExtending" class="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
+        {{ isExtending ? 'Extending...' : 'Confirm Extension' }}
+      </button>
+    </div>
+  </div>
+</div>

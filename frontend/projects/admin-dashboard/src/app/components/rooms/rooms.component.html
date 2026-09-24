@@ -57,6 +57,18 @@
         <input type="number" [(ngModel)]="formData.base_price" name="price" required class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
       </div>
       <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Room Size</label>
+        <input type="text" [(ngModel)]="formData.room_size" name="room_size" placeholder="e.g. 210 sq.ft" class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">View Type</label>
+        <input type="text" [(ngModel)]="formData.view_type" name="view_type" placeholder="e.g. City View" class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Bed Type</label>
+        <input type="text" [(ngModel)]="formData.bed_type" name="bed_type" placeholder="e.g. 1 Queen Bed" class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Default Capacity</label>
         <input type="number" [(ngModel)]="formData.default_capacity" name="default_capacity" required class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
       </div>
@@ -134,6 +146,108 @@
         </div>
       </div>
 
+      <!-- Detailed Categories Amenities -->
+      <div class="md:col-span-2 bg-gray-50/80 p-5 rounded-xl border border-gray-200 mt-4">
+        <label class="block text-sm font-bold text-gray-800 mb-3">Detailed Amenities & Facilities</label>
+        
+        <div class="space-y-6">
+          <ng-container *ngFor="let cat of amenityCategories">
+            <div>
+              <h4 class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">{{ cat }}</h4>
+              <div class="flex items-center gap-2 mb-2">
+                <input type="text" [(ngModel)]="customDetailedAmenityInput[cat]" name="detailed_amenity_{{cat}}"
+                  (keydown.enter)="$event.preventDefault(); addDetailedAmenity(cat)"
+                  placeholder="Add item..."
+                  class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs bg-white">
+                <button type="button" (click)="addDetailedAmenity(cat)" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold">Add</button>
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <span *ngFor="let item of formData.detailed_amenities[cat]; let i = index" class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-md bg-blue-50 text-blue-800 border border-blue-200 shadow-2xs">
+                  {{ item }}
+                  <button type="button" (click)="removeDetailedAmenity(cat, i)" class="hover:text-red-600 ml-1 font-bold text-sm cursor-pointer leading-none">×</button>
+                </span>
+              </div>
+            </div>
+          </ng-container>
+        </div>
+        
+        <div class="mt-6 pt-6 border-t border-gray-200">
+          <h4 class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Early Check-in / Late Check-out Policy</h4>
+          <p class="text-[10px] text-gray-500 mb-2">Leave blank to hide this block on the Guest Widget.</p>
+          <textarea [(ngModel)]="formData.detailed_amenities.early_checkin_policy" name="early_checkin_policy" rows="2"
+            placeholder="e.g. Guaranteed early check-in & late check-out at an extra charge."
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs bg-white resize-none"></textarea>
+        </div>
+      </div>
+
+      <!-- Rate Plans -->
+      <div class="md:col-span-2 bg-gray-50/80 p-5 rounded-xl border border-gray-200 mt-4">
+        <label class="block text-sm font-bold text-gray-800 mb-3">Rate Plans & Packages</label>
+        
+        <!-- Existing Rate Plans -->
+        <div class="space-y-3 mb-6" *ngIf="formData.rate_plans?.length > 0">
+          <div *ngFor="let plan of formData.rate_plans; let i = index" class="bg-white border border-gray-200 p-4 rounded-lg flex justify-between items-start">
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <span class="font-bold text-gray-800">{{ plan.name }}</span>
+                <span *ngIf="plan.badge" class="bg-blue-100 text-blue-700 text-[10px] font-bold uppercase px-2 py-0.5 rounded">{{ plan.badge }}</span>
+              </div>
+              <p class="text-xs text-gray-500 mb-2">Package Price: <span class="font-bold text-gray-700">₹{{ formData.base_price * plan.priceMultiplier | number:'1.0-0' }}</span> per night</p>
+              <ul class="text-xs text-gray-600 list-disc list-inside">
+                <li *ngFor="let inc of plan.inclusions">{{ inc }}</li>
+              </ul>
+            </div>
+            <div class="flex flex-col gap-2">
+              <button type="button" (click)="editRatePlan(i)" class="text-blue-500 hover:text-blue-700 font-medium text-xs">Edit</button>
+              <button type="button" (click)="removeRatePlan(i)" class="text-red-500 hover:text-red-700 font-medium text-xs">Remove</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add/Edit Rate Plan Form -->
+        <div class="bg-white border border-gray-300 p-4 rounded-lg shadow-sm" [ngClass]="editingRatePlanIndex !== null ? 'border-solid border-blue-400 bg-blue-50/30' : 'border-dashed'">
+          <h4 class="text-sm font-bold text-gray-700 mb-3">{{ editingRatePlanIndex !== null ? 'Edit Rate Plan' : 'Add New Rate Plan' }}</h4>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">Plan ID (e.g. room-only)</label>
+              <input type="text" [(ngModel)]="newRatePlan.id" name="rp_id" class="w-full px-3 py-1.5 border border-gray-300 rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">Plan Name</label>
+              <input type="text" [(ngModel)]="newRatePlan.name" name="rp_name" placeholder="e.g. Bed & Breakfast" class="w-full px-3 py-1.5 border border-gray-300 rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">Badge (Optional)</label>
+              <input type="text" [(ngModel)]="newRatePlan.badge" name="rp_badge" placeholder="e.g. Best Value" class="w-full px-3 py-1.5 border border-gray-300 rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">Package Price (₹ per night)</label>
+              <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-bold">₹</span>
+                <input type="number" min="0" [(ngModel)]="newRatePlan.packagePrice" name="rp_pkg_price"
+                  class="w-full pl-7 pr-3 py-1.5 border border-gray-300 rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm">
+              </div>
+              <p class="text-[10px] text-gray-400 mt-1">Base room price: ₹{{ formData.base_price }}. Set a higher price for premium packages.</p>
+            </div>
+          </div>
+          
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Inclusions</label>
+          <div class="flex gap-2 mb-2">
+            <input type="text" [(ngModel)]="newRatePlan.newInclusion" name="rp_inc" (keydown.enter)="$event.preventDefault(); addRatePlanInclusion()" placeholder="e.g. Free Breakfast" class="flex-1 px-3 py-1.5 border border-gray-300 rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm">
+            <button type="button" (click)="addRatePlanInclusion()" class="px-3 bg-gray-100 border border-gray-300 rounded text-xs font-bold hover:bg-gray-200">Add Inclusion</button>
+          </div>
+          <ul class="text-xs text-gray-600 list-disc list-inside mb-4">
+            <li *ngFor="let inc of newRatePlan.inclusions; let i = index" class="flex justify-between items-center bg-gray-50 px-2 py-1 mb-1 rounded border border-gray-100">
+              {{ inc }} <button type="button" (click)="removeRatePlanInclusion(i)" class="text-red-500">×</button>
+            </li>
+          </ul>
+
+          <div class="flex gap-2">
+            <button type="button" *ngIf="editingRatePlanIndex !== null" (click)="resetNewRatePlan()" class="flex-1 py-2 bg-white text-gray-700 border border-gray-300 rounded font-bold text-sm hover:bg-gray-50 transition">Cancel Edit</button>
+            <button type="button" (click)="addRatePlan()" class="flex-[2] py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded font-bold text-sm hover:bg-blue-100 transition">{{ editingRatePlanIndex !== null ? 'Update Rate Plan' : 'Save Rate Plan' }}</button>
+          </div>
+        </div>
+      </div>
 
     </div>
 

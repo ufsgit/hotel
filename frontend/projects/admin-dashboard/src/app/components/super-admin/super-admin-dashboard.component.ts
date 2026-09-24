@@ -18,11 +18,22 @@ export class SuperAdminDashboardComponent implements OnInit {
   // ── Data ──────────────────────────────────────────────────────────────────
   hotels: any[] = [];
   allUsers: any[] = [];
-  filteredUsers: any[] = [];
+  filteredUsers: any[] = []; // Used for display
   topHotels: any[] = [];
   recentBookings: any[] = [];
   platformStats: any = null;
   platformSettings: any = null;
+
+  // Pagination State
+  hotelsPage = 1;
+  hotelsLimit = 10;
+  hotelsTotal = 0;
+  hotelsTotalPages = 1;
+
+  usersPage = 1;
+  usersLimit = 10;
+  usersTotal = 0;
+  usersTotalPages = 1;
 
   // ── Loading / Error ───────────────────────────────────────────────────────
   isLoading = true;
@@ -35,13 +46,21 @@ export class SuperAdminDashboardComponent implements OnInit {
   // ── Create Hotel modal ────────────────────────────────────────────────────
   showHotelModal = false;
   editingHotel: any = null;
-  hotelForm = { name: '', address: '', contact_email: '', contact_phone: '', branding_primary_color: '#6366f1' };
+  hotelForm: any = { name: '', address: '', contact_email: '', contact_phone: '', branding_primary_color: '#6366f1', branding_logo_url: '', timezone: 'UTC', tax_rate: 10, razorpay_key_id: '', razorpay_key_secret: '', razorpay_webhook_secret: '', smtp_host: '', smtp_port: null, smtp_user: '', smtp_pass: '' };
   hotelSubmitting = false;
   hotelError = '';
+  showHotelSecret = false;
+  showWebhookSecret = false;
+  timezones = [
+    'UTC', 'Asia/Kolkata', 'America/New_York', 'America/Chicago',
+    'America/Denver', 'America/Los_Angeles', 'Europe/London',
+    'Europe/Paris', 'Europe/Berlin', 'Asia/Dubai', 'Asia/Singapore',
+    'Asia/Tokyo', 'Australia/Sydney', 'Pacific/Auckland'
+  ];
 
   // ── Create Admin modal ────────────────────────────────────────────────────
   showAdminModal = false;
-  adminForm = { name: '', email: '', password: '', hotel_id: 0, hotel_name: '' };
+  adminForm = { name: '', email: '', password: '', hotel_id: 0, hotel_name: '', role: 'owner' };
   adminSubmitting = false;
   adminError = '';
 
@@ -113,15 +132,40 @@ export class SuperAdminDashboardComponent implements OnInit {
 
   // ── Hotels ─────────────────────────────────────────────────────────────────
   loadHotels(): void {
-    this.api.getHotels().subscribe({
-      next: data => { this.hotels = data; },
+    this.api.getHotels(this.hotelsPage, this.hotelsLimit).subscribe({
+      next: data => { 
+        this.hotels = data.hotels; 
+        this.hotelsTotal = data.total;
+        this.hotelsTotalPages = data.totalPages;
+      },
       error: err => { this.error = err.error?.error || 'Failed to load hotels.'; }
     });
   }
 
+  nextHotelPage(): void {
+    if (this.hotelsPage < this.hotelsTotalPages) {
+      this.hotelsPage++;
+      this.loadHotels();
+    }
+  }
+
+  prevHotelPage(): void {
+    if (this.hotelsPage > 1) {
+      this.hotelsPage--;
+      this.loadHotels();
+    }
+  }
+
   openCreateHotelModal(): void {
     this.editingHotel = null;
-    this.hotelForm = { name: '', address: '', contact_email: '', contact_phone: '', branding_primary_color: '#6366f1' };
+    const defaultColor = this.settingsForm?.default_primary_color || '#6366f1';
+    this.hotelForm = { 
+      name: '', address: '', contact_email: '', contact_phone: '', 
+      branding_primary_color: defaultColor, branding_logo_url: '', timezone: 'UTC', 
+      tax_rate: 10, razorpay_key_id: '', razorpay_key_secret: '', razorpay_webhook_secret: '',
+      cancellation_allowed: true, cancellation_fee_type: 'percentage', cancellation_fee: 0, auto_refund: false, min_days_before_cancel: 0,
+      smtp_host: '', smtp_port: null, smtp_user: '', smtp_pass: ''
+    };
     this.hotelError = '';
     this.showHotelModal = true;
   }
@@ -130,7 +174,20 @@ export class SuperAdminDashboardComponent implements OnInit {
     this.editingHotel = hotel;
     this.hotelForm = {
       name: hotel.name, address: hotel.address || '', contact_email: hotel.contact_email || '',
-      contact_phone: hotel.contact_phone || '', branding_primary_color: hotel.branding_primary_color || '#6366f1'
+      contact_phone: hotel.contact_phone || '', branding_primary_color: hotel.branding_primary_color || this.settingsForm?.default_primary_color || '#6366f1',
+      branding_logo_url: hotel.branding_logo_url || '', timezone: hotel.timezone || 'UTC',
+      tax_rate: hotel.tax_rate ?? 10, razorpay_key_id: hotel.razorpay_key_id || '', razorpay_key_secret: hotel.razorpay_key_secret || '',
+      razorpay_webhook_secret: hotel.razorpay_webhook_secret || '',
+      uuid: hotel.uuid || '',
+      cancellation_allowed: hotel.cancellation_allowed !== undefined ? !!hotel.cancellation_allowed : true,
+      cancellation_fee_type: hotel.cancellation_fee_type || 'percentage',
+      cancellation_fee: hotel.cancellation_fee ?? 0,
+      auto_refund: !!hotel.auto_refund,
+      min_days_before_cancel: hotel.min_days_before_cancel ?? 0,
+      smtp_host: hotel.smtp_host || '',
+      smtp_port: hotel.smtp_port || null,
+      smtp_user: hotel.smtp_user || '',
+      smtp_pass: hotel.smtp_pass || ''
     };
     this.hotelError = '';
     this.showHotelModal = true;
@@ -193,7 +250,7 @@ export class SuperAdminDashboardComponent implements OnInit {
 
   // ── Admin Modal ────────────────────────────────────────────────────────────
   openAdminModal(hotel: any): void {
-    this.adminForm = { name: '', email: '', password: '', hotel_id: hotel.id, hotel_name: hotel.name };
+    this.adminForm = { name: '', email: '', password: '', hotel_id: hotel.id, hotel_name: hotel.name, role: 'owner' };
     this.adminError = '';
     this.showAdminModal = true;
   }
@@ -204,11 +261,11 @@ export class SuperAdminDashboardComponent implements OnInit {
     }
     this.adminSubmitting = true;
     this.adminError = '';
-    this.api.createHotelAdmin({ name: this.adminForm.name, email: this.adminForm.email, password: this.adminForm.password, hotel_id: this.adminForm.hotel_id }).subscribe({
+    this.api.createHotelAdmin({ name: this.adminForm.name, email: this.adminForm.email, password: this.adminForm.password, hotel_id: this.adminForm.hotel_id, role: this.adminForm.role }).subscribe({
       next: () => {
         this.adminSubmitting = false;
         this.showAdminModal = false;
-        this.showSuccess('Hotel Admin created!');
+        this.showSuccess('User created!');
         if (this.showStaffPanel && this.staffPanelHotel?.id === this.adminForm.hotel_id) {
           this.openStaffPanel(this.staffPanelHotel);
         }
@@ -220,26 +277,36 @@ export class SuperAdminDashboardComponent implements OnInit {
   // ── Users ──────────────────────────────────────────────────────────────────
   loadUsers(): void {
     this.usersLoading = true;
-    this.api.getAllUsers().subscribe({
-      next: users => { this.allUsers = users; this.applyUserFilter(); this.usersLoading = false; },
+    this.api.getAllUsers(this.usersPage, this.usersLimit, this.userSearch, this.userHotelFilter).subscribe({
+      next: data => { 
+        this.allUsers = data.users; 
+        this.filteredUsers = data.users; 
+        this.usersTotal = data.total;
+        this.usersTotalPages = data.totalPages;
+        this.usersLoading = false; 
+      },
       error: () => { this.usersLoading = false; }
     });
   }
 
-  applyUserFilter(): void {
-    let list = [...this.allUsers];
-    if (this.userSearch) {
-      const q = this.userSearch.toLowerCase();
-      list = list.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
+  nextUserPage(): void {
+    if (this.usersPage < this.usersTotalPages) {
+      this.usersPage++;
+      this.loadUsers();
     }
-    if (this.userHotelFilter) {
-      list = list.filter(u => u.hotel_name === this.userHotelFilter);
-    }
-    this.filteredUsers = list;
   }
 
-  get uniqueHotelNames(): string[] {
-    return [...new Set(this.allUsers.map(u => u.hotel_name).filter(Boolean))];
+  prevUserPage(): void {
+    if (this.usersPage > 1) {
+      this.usersPage--;
+      this.loadUsers();
+    }
+  }
+
+  applyUserFilter(): void {
+    // Reset to page 1 on filter
+    this.usersPage = 1;
+    this.loadUsers();
   }
 
   // ── Reset Password ─────────────────────────────────────────────────────────

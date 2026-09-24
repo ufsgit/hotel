@@ -23,27 +23,47 @@ router.use(superAdminOnly);
 // HOTEL MANAGEMENT
 // ─────────────────────────────────────────────────────────────────────────────
 
-// GET /api/superadmin/hotels — list all hotels
+// GET /api/superadmin/hotels — list all hotels (paginated)
 router.get('/hotels', async (req, res) => {
     try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const offset = (page - 1) * limit;
+
+        const [countResult] = await pool.query('SELECT COUNT(*) as total FROM hotels');
+        const total = countResult[0].total;
+
         const [hotels] = await pool.query(`
             SELECT 
                 h.id, h.uuid, h.name, h.slug, h.address, h.contact_email, h.contact_phone,
                 h.branding_primary_color, h.branding_logo_url, h.is_suspended, h.created_at,
-                h.razorpay_key_id,
-                COUNT(DISTINCT b.id) as total_bookings,
-                SUM(CASE WHEN b.booking_status NOT IN ('cancelled', 'checked_out') THEN 1 ELSE 0 END) as active_bookings,
-                COALESCE(SUM(CASE WHEN b.booking_status != 'cancelled' THEN b.total_amount ELSE 0 END), 0) as revenue,
-                COUNT(DISTINCT uh.user_id) as user_count,
-                COUNT(DISTINCT rt.id) as room_type_count
+                h.razorpay_key_id, h.razorpay_webhook_secret, h.cancellation_allowed, h.cancellation_fee_type, h.cancellation_fee, h.auto_refund, h.min_days_before_cancel,
+                (SELECT COUNT(id) FROM bookings WHERE hotel_id = h.id) as total_bookings,
+                (SELECT COUNT(id) FROM bookings WHERE hotel_id = h.id AND booking_status NOT IN ('cancelled', 'checked_out')) as active_bookings,
+                (SELECT COALESCE(SUM(CASE 
+                    WHEN payment_status = 'paid' THEN total_amount 
+                    WHEN payment_status = 'partial' THEN COALESCE(amount_paid, 0)
+                    ELSE 0 
+                END), 0) FROM bookings WHERE hotel_id = h.id AND booking_status != 'cancelled') +
+                (SELECT COALESCE(SUM(CASE 
+                    WHEN payment_status = 'paid' THEN amount 
+                    WHEN payment_status = 'partial' THEN COALESCE(amount_paid, 0)
+                    ELSE 0 
+                END), 0) FROM booking_expenses WHERE hotel_id = h.id) as revenue,
+                (SELECT COUNT(user_id) FROM user_hotels WHERE hotel_id = h.id) as user_count,
+                (SELECT COUNT(id) FROM room_types WHERE hotel_id = h.id) as room_type_count
             FROM hotels h
-            LEFT JOIN bookings b ON h.id = b.hotel_id
-            LEFT JOIN user_hotels uh ON h.id = uh.hotel_id
-            LEFT JOIN room_types rt ON h.id = rt.hotel_id
-            GROUP BY h.id
             ORDER BY h.created_at DESC
-        `);
-        res.json(hotels);
+            LIMIT ? OFFSET ?
+        `, [limit, offset]);
+        
+        res.json({
+            hotels,
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit)
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -127,7 +147,7 @@ router.get('/hotels/:id/stats', async (req, res) => {
 // POST /api/superadmin/hotels — create new hotel
 router.post('/hotels', async (req, res) => {
     try {
-        const { name, address, contact_email, contact_phone, branding_primary_color } = req.body;
+        const { name, address, contact_email, contact_phone, branding_primary_color, smtp_host, smtp_port, smtp_user, smtp_pass } = req.body;
         if (!name) return res.status(400).json({ error: 'Hotel name is required.' });
 
         const uuid = crypto.randomUUID();
@@ -138,9 +158,9 @@ router.post('/hotels', async (req, res) => {
         // Append a random string to slug to ensure uniqueness if needed, but for now we'll just try inserting
         try {
             const [result] = await pool.query(
-                `INSERT INTO hotels (name, slug, uuid, address, contact_email, contact_phone, branding_primary_color, timezone)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'UTC')`,
-                [name, slug, uuid, address || null, contact_email || null, contact_phone || null, branding_primary_color || '#6366f1']
+                `INSERT INTO hotels (name, slug, uuid, address, contact_email, contact_phone, branding_primary_color, timezone, smtp_host, smtp_port, smtp_user, smtp_pass)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'UTC', ?, ?, ?, ?)`,
+                [name, slug, uuid, address || null, contact_email || null, contact_phone || null, branding_primary_color || '#6366f1', smtp_host || null, smtp_port || null, smtp_user || null, smtp_pass || null]
             );
             res.status(201).json({ id: result.insertId, name, slug, uuid, message: 'Hotel created successfully.' });
         } catch (dbErr) {
@@ -148,9 +168,9 @@ router.post('/hotels', async (req, res) => {
                 // If slug is duplicate, append a random suffix
                 slug = slug + '-' + crypto.randomBytes(2).toString('hex');
                 const [result] = await pool.query(
-                    `INSERT INTO hotels (name, slug, uuid, address, contact_email, contact_phone, branding_primary_color, timezone)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, 'UTC')`,
-                    [name, slug, uuid, address || null, contact_email || null, contact_phone || null, branding_primary_color || '#6366f1']
+                    `INSERT INTO hotels (name, slug, uuid, address, contact_email, contact_phone, branding_primary_color, timezone, smtp_host, smtp_port, smtp_user, smtp_pass)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, 'UTC', ?, ?, ?, ?)`,
+                    [name, slug, uuid, address || null, contact_email || null, contact_phone || null, branding_primary_color || '#6366f1', smtp_host || null, smtp_port || null, smtp_user || null, smtp_pass || null]
                 );
                 res.status(201).json({ id: result.insertId, name, slug, uuid, message: 'Hotel created successfully.' });
             } else {
@@ -165,16 +185,31 @@ router.post('/hotels', async (req, res) => {
 // PUT /api/superadmin/hotels/:id — edit hotel details
 router.put('/hotels/:id', async (req, res) => {
     try {
-        const { name, address, contact_email, contact_phone, branding_primary_color } = req.body;
+        const { name, address, contact_email, contact_phone, branding_primary_color, branding_logo_url, timezone, tax_rate, razorpay_key_id, razorpay_key_secret, razorpay_webhook_secret, cancellation_allowed, cancellation_fee_type, cancellation_fee, auto_refund, min_days_before_cancel, smtp_host, smtp_port, smtp_user, smtp_pass } = req.body;
         await pool.query(
             `UPDATE hotels SET
                 name = COALESCE(?, name),
                 address = COALESCE(?, address),
                 contact_email = COALESCE(?, contact_email),
                 contact_phone = COALESCE(?, contact_phone),
-                branding_primary_color = COALESCE(?, branding_primary_color)
+                branding_primary_color = COALESCE(?, branding_primary_color),
+                branding_logo_url = COALESCE(?, branding_logo_url),
+                timezone = COALESCE(?, timezone),
+                tax_rate = COALESCE(?, tax_rate),
+                razorpay_key_id = COALESCE(?, razorpay_key_id),
+                razorpay_key_secret = COALESCE(?, razorpay_key_secret),
+                cancellation_allowed = COALESCE(?, cancellation_allowed),
+                cancellation_fee_type = COALESCE(?, cancellation_fee_type),
+                cancellation_fee = COALESCE(?, cancellation_fee),
+                auto_refund = COALESCE(?, auto_refund),
+                min_days_before_cancel = COALESCE(?, min_days_before_cancel),
+                razorpay_webhook_secret = ?,
+                smtp_host = ?,
+                smtp_port = ?,
+                smtp_user = ?,
+                smtp_pass = ?
              WHERE id = ?`,
-            [name, address, contact_email, contact_phone, branding_primary_color, req.params.id]
+            [name, address, contact_email, contact_phone, branding_primary_color, branding_logo_url, timezone, tax_rate, razorpay_key_id, razorpay_key_secret, cancellation_allowed, cancellation_fee_type, cancellation_fee, auto_refund, min_days_before_cancel, razorpay_webhook_secret || null, smtp_host || null, smtp_port || null, smtp_user || null, smtp_pass || null, req.params.id]
         );
         res.json({ message: 'Hotel updated successfully.' });
     } catch (err) {
@@ -226,15 +261,54 @@ router.get('/hotels/:id/users', async (req, res) => {
 // GET /api/superadmin/users — list all users (all hotels)
 router.get('/users', async (req, res) => {
     try {
-        const [rows] = await pool.query(`
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const search = req.query.search || '';
+        const hotelFilter = req.query.hotel || '';
+        const offset = (page - 1) * limit;
+
+        let queryParams = [];
+        let countQuery = `
+            SELECT COUNT(*) as total 
+            FROM users u
+            LEFT JOIN user_hotels uh ON u.id = uh.user_id
+            LEFT JOIN hotels h ON uh.hotel_id = h.id
+            WHERE u.role != 'super_admin'
+        `;
+        let mainQuery = `
             SELECT u.id, u.name, u.email, u.role as global_role, u.created_at, h.name as hotel_name, h.id as hotel_id, uh.role as role
             FROM users u
             LEFT JOIN user_hotels uh ON u.id = uh.user_id
             LEFT JOIN hotels h ON uh.hotel_id = h.id
             WHERE u.role != 'super_admin'
-            ORDER BY u.created_at DESC
-        `);
-        res.json(rows);
+        `;
+
+        if (search) {
+            countQuery += ` AND (u.name LIKE ? OR u.email LIKE ?)`;
+            mainQuery += ` AND (u.name LIKE ? OR u.email LIKE ?)`;
+            queryParams.push(`%${search}%`, `%${search}%`);
+        }
+        if (hotelFilter) {
+            countQuery += ` AND h.name = ?`;
+            mainQuery += ` AND h.name = ?`;
+            queryParams.push(hotelFilter);
+        }
+
+        const [countResult] = await pool.query(countQuery, queryParams);
+        const total = countResult[0].total;
+
+        mainQuery += ` ORDER BY u.created_at DESC LIMIT ? OFFSET ?`;
+        queryParams.push(limit, offset);
+
+        const [users] = await pool.query(mainQuery, queryParams);
+
+        res.json({
+            users,
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit)
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -243,7 +317,7 @@ router.get('/users', async (req, res) => {
 // POST /api/superadmin/users — create hotel admin
 router.post('/users', async (req, res) => {
     try {
-        const { name, email, password, hotel_id } = req.body;
+        const { name, email, password, hotel_id, role = 'owner' } = req.body;
         if (!name || !email || !password || !hotel_id) {
             return res.status(400).json({ error: 'name, email, password, and hotel_id are all required.' });
         }
@@ -269,10 +343,10 @@ router.post('/users', async (req, res) => {
         // Add user to hotel
         await pool.query(
             'INSERT IGNORE INTO user_hotels (user_id, hotel_id, role) VALUES (?, ?, ?)',
-            [userId, hotel_id, 'owner']
+            [userId, hotel_id, role]
         );
 
-        res.status(201).json({ id: userId, name, email, role: 'owner', hotel_id, message: 'Hotel Admin added successfully.' });
+        res.status(201).json({ id: userId, name, email, role, hotel_id, message: 'User added successfully.' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -306,7 +380,13 @@ router.patch('/users/:id/reset-password', async (req, res) => {
 // POST /api/superadmin/impersonate/:userId — issue impersonation token
 router.post('/impersonate/:userId', async (req, res) => {
     try {
-        const [users] = await pool.query('SELECT id, hotel_id, role, name, email FROM users WHERE id = ? AND role != "super_admin"', [req.params.userId]);
+        const [users] = await pool.query(`
+            SELECT u.id, u.name, u.email, uh.hotel_id, uh.role
+            FROM users u
+            LEFT JOIN user_hotels uh ON u.id = uh.user_id
+            WHERE u.id = ? AND u.role != "super_admin"
+        `, [req.params.userId]);
+        
         if (users.length === 0) return res.status(404).json({ error: 'User not found.' });
 
         const user = users[0];

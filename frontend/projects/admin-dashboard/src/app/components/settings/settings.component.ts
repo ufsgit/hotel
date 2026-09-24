@@ -19,8 +19,6 @@ export class SettingsComponent implements OnInit {
 
   // Preview shown before/after upload
   logoPreview: string | null = null;
-  selectedFile: File | null = null;
-  isDragging = false;
   showSecret = false;
 
   formData: any = {
@@ -59,86 +57,48 @@ export class SettingsComponent implements OnInit {
     });
   }
 
-  // ── File selection ──────────────────────────────────────────────────────────
-  onFileSelected(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (input.files && input.files[0]) this.prepareFile(input.files[0]);
-  }
+  saveSettings(): void {
+    this.successMsg = '';
+    this.errorMsg = '';
+    this.isSaving = true;
 
-  onDragOver(event: DragEvent): void {
-    event.preventDefault();
-    this.isDragging = true;
-  }
+    const payload: any = {
+      tax_rate: this.formData.tax_rate,
+      razorpay_key_id: this.formData.razorpay_key_id,
+      razorpay_key_secret: this.formData.razorpay_key_secret,
+      branding_primary_color: this.formData.branding_primary_color,
+      branding_logo_url: this.formData.branding_logo_url
+    };
 
-  onDragLeave(): void { this.isDragging = false; }
-
-  onDrop(event: DragEvent): void {
-    event.preventDefault();
-    this.isDragging = false;
-    const file = event.dataTransfer?.files[0];
-    if (file) this.prepareFile(file);
-  }
-
-  private prepareFile(file: File): void {
-    this.uploadError = '';
-    if (!file.type.startsWith('image/')) {
-      this.uploadError = 'Please upload an image file (JPG, PNG, GIF, WebP).';
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      this.uploadError = 'File is too large. Maximum size is 5 MB.';
-      return;
-    }
-    this.selectedFile = file;
-    // Show local preview immediately
-    const reader = new FileReader();
-    reader.onload = (e) => this.logoPreview = e.target?.result as string;
-    reader.readAsDataURL(file);
-  }
-
-  // ── Upload to server ────────────────────────────────────────────────────────
-  uploadLogo(): void {
-    if (!this.selectedFile) return;
-    this.isUploading = true;
-    this.uploadError = '';
-
-    this.api.uploadLogo(this.selectedFile).subscribe({
-      next: (res) => {
-        this.formData.branding_logo_url = res.url;
-        this.logoPreview = res.url;
-        this.selectedFile = null;
-        this.isUploading = false;
-        this.successMsg = '✅ Logo uploaded successfully!';
+    this.api.updateHotelSettings(payload).subscribe({
+      next: () => {
+        this.isSaving = false;
+        this.successMsg = 'Settings saved successfully!';
         setTimeout(() => this.successMsg = '', 4000);
       },
-      error: () => {
-        this.isUploading = false;
-        this.uploadError = 'Upload failed. Please try again.';
+      error: (err) => {
+        this.isSaving = false;
+        this.errorMsg = err?.error?.error || 'Failed to save settings.';
       }
     });
   }
 
-  removeLogo(): void {
-    this.logoPreview = null;
-    this.selectedFile = null;
-    this.formData.branding_logo_url = '';
-  }
+  onLogoFileChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files?.length) return;
+    const file = input.files[0];
+    this.isUploading = true;
+    this.uploadError = '';
 
-  // ── Save all settings ───────────────────────────────────────────────────────
-  save(): void {
-    this.isSaving = true;
-    this.successMsg = '';
-    this.errorMsg = '';
-
-    this.api.updateHotelSettings(this.formData).subscribe({
-      next: () => {
-        this.isSaving = false;
-        this.successMsg = '✅ Hotel settings saved successfully!';
-        setTimeout(() => this.successMsg = '', 4000);
+    this.api.uploadLogo(file).subscribe({
+      next: (res) => {
+        this.formData.branding_logo_url = res.url;
+        this.logoPreview = res.url;
+        this.isUploading = false;
       },
       error: () => {
-        this.isSaving = false;
-        this.errorMsg = '❌ Failed to save settings. Please try again.';
+        this.uploadError = 'Logo upload failed.';
+        this.isUploading = false;
       }
     });
   }

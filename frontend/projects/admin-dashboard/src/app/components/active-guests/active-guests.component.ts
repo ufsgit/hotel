@@ -24,6 +24,12 @@ export class ActiveGuestsComponent implements OnInit {
   detailsGuest: any = null;
   isGuestDetailsModalOpen = false;
 
+  // Extend Stay Modal State
+  isExtendModalOpen = false;
+  extendGuest: any = null;
+  extendNights: number = 1;
+  isExtending = false;
+
   // New Expense Form State
   newExpense = {
     expense_type: 'food',
@@ -69,6 +75,38 @@ export class ActiveGuestsComponent implements OnInit {
   closeGuestDetailsModal(): void {
     this.isGuestDetailsModalOpen = false;
     this.detailsGuest = null;
+  }
+
+  // --- Extend Stay Modal Methods ---
+  openExtendModal(guest: any): void {
+    this.extendGuest = guest;
+    this.extendNights = 1;
+    this.isExtendModalOpen = true;
+  }
+
+  closeExtendModal(): void {
+    this.isExtendModalOpen = false;
+    this.extendGuest = null;
+    this.extendNights = 1;
+  }
+
+  extendStay(): void {
+    if (!this.extendGuest || this.extendNights < 1) return;
+
+    this.isExtending = true;
+    this.api.extendStay(this.extendGuest.id, this.extendNights).subscribe({
+      next: (res) => {
+        this.isExtending = false;
+        this.closeExtendModal();
+        this.loadActiveGuests();
+        // You could show a toast notification here with res.message
+      },
+      error: (err) => {
+        console.error('Failed to extend stay', err);
+        this.isExtending = false;
+        alert(err.error?.error || 'Failed to extend stay');
+      }
+    });
   }
 
   openExpensesModal(guest: any): void {

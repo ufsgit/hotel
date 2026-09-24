@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
@@ -9,7 +9,8 @@ export class SuperAdminApiService {
   constructor(private http: HttpClient) {}
 
   private getHeaders(): HttpHeaders {
-    const token = localStorage.getItem('token');
+    // Super admin token is in sessionStorage (tab-isolated)
+    const token = sessionStorage.getItem('sa_token') || localStorage.getItem('token');
     return new HttpHeaders({ 'Authorization': `Bearer ${token}` });
   }
 
@@ -28,8 +29,9 @@ export class SuperAdminApiService {
   }
 
   // ── Hotel Management ────────────────────────────────────────────────────────
-  getHotels(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.baseUrl}/hotels`, { headers: this.getHeaders() });
+  getHotels(page: number = 1, limit: number = 10): Observable<any> {
+    const params = new HttpParams().set('page', page).set('limit', limit);
+    return this.http.get<any>(`${this.baseUrl}/hotels`, { headers: this.getHeaders(), params });
   }
   createHotel(data: any): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/hotels`, data, { headers: this.getHeaders() });
@@ -45,13 +47,16 @@ export class SuperAdminApiService {
   }
 
   // ── User / Staff Management ─────────────────────────────────────────────────
-  getAllUsers(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.baseUrl}/users`, { headers: this.getHeaders() });
+  getAllUsers(page: number = 1, limit: number = 10, search: string = '', hotelFilter: string = ''): Observable<any> {
+    let params = new HttpParams().set('page', page).set('limit', limit);
+    if (search) params = params.set('search', search);
+    if (hotelFilter) params = params.set('hotel', hotelFilter);
+    return this.http.get<any>(`${this.baseUrl}/users`, { headers: this.getHeaders(), params });
   }
   getHotelUsers(hotelId: number): Observable<any[]> {
     return this.http.get<any[]>(`${this.baseUrl}/hotels/${hotelId}/users`, { headers: this.getHeaders() });
   }
-  createHotelAdmin(data: { name: string; email: string; password: string; hotel_id: number }): Observable<any> {
+  createHotelAdmin(data: { name: string; email: string; password: string; hotel_id: number; role?: string }): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/users`, data, { headers: this.getHeaders() });
   }
   deleteUser(userId: number): Observable<any> {
